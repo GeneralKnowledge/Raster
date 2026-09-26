@@ -79,10 +79,17 @@ def main(argv: list[str] | None = None) -> int:
                 smooth_level=args.smooth_level,
             )
             resolved = presets.resolve(
-                args.preset, args.smooth_level, args.detail
+                args.preset,
+                args.smooth_level,
+                args.detail,
+                max_colors=args.max_colors,
+                compression_level=args.compression_level,
             )
             svg = vectorizer.vectorize(pre.png_bytes, **resolved.kwargs)
-            svg, _ = optimizer.optimize_safe(svg, args.compression_level)
+            scour_level = (
+                args.compression_level if args.compression_level >= 3 else 0
+            )
+            svg, _ = optimizer.optimize_safe(svg, scour_level)
             elapsed_ms = (time.perf_counter() - started) * 1000.0
         except AppError as exc:
             print(f"{path.name:<24} ERROR {exc.code}: {exc.message}")

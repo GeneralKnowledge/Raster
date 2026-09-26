@@ -125,7 +125,13 @@ async def _run_vectorize_pipeline(
         smooth_level=smooth_level,
     )
 
-    resolved = presets.resolve(preset, smooth_level, detail)
+    resolved = presets.resolve(
+        preset,
+        smooth_level,
+        detail,
+        max_colors=max_colors,
+        compression_level=compression_level,
+    )
 
     svg = await asyncio.to_thread(
         vectorizer.vectorize,
@@ -133,11 +139,15 @@ async def _run_vectorize_pipeline(
         **resolved.kwargs,
     )
 
+    # Scour only for aggressive level 3; 0–2 use native Config.optimize
+    scour_level = compression_level if compression_level >= 3 else 0
     optimized_svg, was_optimized = await asyncio.to_thread(
         optimizer.optimize_safe,
         svg,
-        compression_level,
+        scour_level,
     )
+    if resolved.optimize > 0:
+        was_optimized = True
 
     elapsed_ms = (time.perf_counter() - started) * 1000.0
     out_name = svg_output_filename(normalized.filename)
@@ -153,7 +163,7 @@ async def _run_vectorize_pipeline(
         "optimized": was_optimized,
         "processing_ms": elapsed_ms,
         "denoise": pre.denoise,
-        "max_colors": pre.max_colors,
+        "max_colors": resolved.max_colors,
         "preset": preset,
         "smooth_level": smooth_level,
         "compression_level": compression_level,

@@ -82,8 +82,8 @@ SMOOTH_LEVEL_DESC = (
     "higher values produce smoother splines."
 )
 COMPRESSION_LEVEL_DESC = (
-    "SVG compression via Scour: 0=passthrough, 1=strip metadata, "
-    "2=numeric+structural cleanup (default), 3=aggressive minify."
+    "Compression: 0=off, 1–2=VTracer native optimize, "
+    "3=native optimize + aggressive Scour minify."
 )
 DETAIL_DESC = "Detail overlay: low (fewer shapes), medium, high (more detail)."
 PRESET_DESC = (

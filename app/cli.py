@@ -64,9 +64,16 @@ def main(argv: list[str] | None = None) -> int:
             flatten_transparency=args.flatten_transparency,
             smooth_level=args.smooth_level,
         )
-        resolved = presets.resolve(args.preset, args.smooth_level, args.detail)
+        resolved = presets.resolve(
+            args.preset,
+            args.smooth_level,
+            args.detail,
+            max_colors=args.max_colors,
+            compression_level=args.compression_level,
+        )
         svg = vectorizer.vectorize(pre.png_bytes, **resolved.kwargs)
-        svg, _ = optimizer.optimize_safe(svg, args.compression_level)
+        scour_level = args.compression_level if args.compression_level >= 3 else 0
+        svg, _ = optimizer.optimize_safe(svg, scour_level)
     except AppError as exc:
         print(f"Error ({exc.code}): {exc.message}", file=sys.stderr)
         return 1

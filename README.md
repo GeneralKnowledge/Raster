@@ -1,6 +1,8 @@
 # Raster to SVG
 
-Production-ready REST API that converts raster images (PNG, JPEG, WebP, BMP) into editable SVG using **stable VTracer 0.6.x only** (`vtracer==0.6.15`).
+Production-ready REST API that converts raster images (PNG, JPEG, WebP, BMP) into editable SVG using **VTracer 1.x** (`vtracer==1.0.0a4`).
+
+> **Note:** 1.x is currently published as an alpha (`1.0.0a4`). It is the recommended upgrade path for quality (watershed clustering, native `max_colors`, `simplify`, mosaic `cutout`, built-in `optimize`). Pin exact version.
 
 Photo mode produces a **stylized poster / illustration**, not continuous-tone photographic fidelity.
 
@@ -11,23 +13,34 @@ python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
-# optional: copy env defaults
-cp .env.example .env
+cp .env.example .env   # optional
 
 uvicorn app.main:app --reload
 ```
 
-Open interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+Open docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ## What it does
 
 1. Validates & normalizes the upload with Pillow (RGBA PNG working buffer)
-2. Optional preprocess: flatten alpha, photo upscale, denoise, color quantize
-3. Resolves a simple preset + smooth/detail overlay into VTracer kwargs
-4. Calls `vtracer.convert_raw_image_to_svg(png_bytes, "png", **kwargs)`
-5. Optionally compresses SVG with Scour (vector-only; fail-soft)
+2. Light preprocess only: optional flatten alpha, photo upscale, median denoise
+3. Resolves preset + smooth/detail/compression into a VTracer **`Config`**
+4. Calls `Config.convert_bytes(png_bytes, format="png")`
+5. Optional Scour pass only at `compression_level=3` (levels 0–2 use native `optimize`)
 
-CPU work runs in `asyncio.to_thread`. Concurrent jobs are limited by `MAX_CONCURRENT_JOBS` (default 2); overflow returns `503 busy`.
+CPU work runs in `asyncio.to_thread`. Concurrency capped by `MAX_CONCURRENT_JOBS` (default 2); overflow → `503 busy`.
+
+## Why 1.x (vs 0.6)
+
+| Capability | 0.6.x | 1.x (`1.0.0a4`) |
+|------------|-------|------------------|
+| API | `convert_raw_image_to_svg` kwargs | `Config` + `convert_bytes` |
+| Clustering | color / binary only | `color-cluster`, `bw`, **`watershed`** |
+| Cutout | hierarchical re-trace | true mosaic `cutout` |
+| Color budget | DIY Pillow quantize | native **`max_colors`** / palette |
+| Curve cleanup | spline knobs only | native **`simplify`** (Schneider re-fit) |
+| SVG minify | Scour only | native **`optimize`** 0–2 (+ optional Scour) |
+| Built-in presets | — | `Config.photo()`, `poster()`, `bw()` |
 
 ## Endpoints
 
@@ -40,52 +53,30 @@ CPU work runs in `asyncio.to_thread`. Concurrent jobs are limited by `MAX_CONCUR
 
 Also: `/docs`, `/redoc`, `/openapi.json`.
 
-### `GET /health`
-
-```json
-{ "status": "ok", "service": "raster-to-svg" }
-```
-
-### `GET /version`
-
-```json
-{ "api_version": "0.1.0", "vtracer_version": "0.6.15" }
-```
-
-### `POST /v1/vectorize`
-
-Multipart form fields:
+### Vectorize multipart fields
 
 | Field | Default | Notes |
 |-------|---------|-------|
 | `file` | required | PNG, JPEG, WebP, BMP |
 | `preset` | `logo` | `logo` \| `illustration` \| `photo` \| `lineart` \| `pixelart` |
-| `smooth_level` | `3` | `0`–`5` (`0` = polygon / minimal) |
-| `compression_level` | `2` | `0`–`3` (Scour) |
-| `detail` | `medium` | `low` \| `medium` \| `high` |
-| `max_colors` | auto | `2`–`64`; photo defaults 12/24/40 by detail |
-| `denoise` | auto | default **on** for `photo` |
+| `smooth_level` | `3` | `0`–`5` → mode + **`simplify`** tolerance |
+| `compression_level` | `2` | `0`–`2` = native optimize; `3` = optimize + Scour |
+| `detail` | `medium` | affects speckles / watershed_detail / photo colors |
+| `max_colors` | auto | passed to Config; photo defaults 12/24/40 |
+| `denoise` | auto | light median; default on for photo |
 | `flatten_transparency` | `false` | flatten soft alpha onto white |
 | `response_format` | `svg` | `svg` \| `json` |
-| `smooth` | — | alias: `false` → `smooth_level=0` |
-| `compress` | — | alias: `false` → `compression_level=0` |
+| `smooth` / `compress` | — | aliases to force level 0 |
 
-**SVG mode:** `Content-Type: image/svg+xml`  
-**JSON mode:** includes `success`, `filename`, `svg` (raw string), `input`, `output`, `settings`, `meta.request_id`, `meta.processing_ms`.
-
-Common headers: `X-Request-Id`, `X-Processing-Ms`, `X-Input-Format`, `X-Input-Size`, `X-Preset`, `X-Smooth-Level`, `X-Compression-Level`, `X-Detail`, `X-Denoise`, `X-Max-Colors`.
-
-### curl examples
+### curl
 
 ```bash
-# SVG response
 curl -sS -X POST "http://localhost:8000/v1/vectorize" \
   -F "file=@examples/logo.png" \
   -F "preset=logo" \
-  -F "smooth_level=3" \
+  -F "smooth_level=4" \
   -o out.svg
 
-# JSON response + photo preset
 curl -sS -X POST "http://localhost:8000/v1/vectorize" \
   -F "file=@examples/photo_sample.png" \
   -F "preset=photo" \
@@ -94,86 +85,43 @@ curl -sS -X POST "http://localhost:8000/v1/vectorize" \
   -F "response_format=json" | jq '.meta, .settings'
 ```
 
-## Presets
+## Presets (1.x)
 
-| Preset | Best for | Notes |
-|--------|----------|-------|
-| `logo` | Logos, icons, flat brand marks | Clean flats |
-| `illustration` | Flat / semi-flat art | Balanced |
-| `photo` | Stylized photos | Poster look, not photo fidelity |
-| `lineart` | Sketches, B/W line drawings | Binary mode, fast |
-| `pixelart` | Pixel / retro art | Cutout hierarchy; polygon at low smooth |
+| Preset | clustering | hierarchical | Notes |
+|--------|------------|--------------|-------|
+| `logo` | color-cluster | stacked | Clean flats + simplify |
+| `illustration` | color-cluster | stacked | Balanced |
+| `photo` | **watershed** | **cutout** | Stylized; native max_colors |
+| `lineart` | **bw** | stacked | Adaptive threshold |
+| `pixelart` | color-cluster | cutout | Polygon at low smooth |
 
-### Smoothing (`smooth_level`)
+### Smoothing
 
-| Level | Mode | Feel |
-|-------|------|------|
-| 0 | polygon | Minimal / angular |
-| 1–2 | spline | Mild |
-| 3 | spline | Default balance |
-| 4–5 | spline | Softest curves |
+`smooth_level` drives spline/polygon mode and VTracer **`simplify`** (px tolerance). Higher = fewer cubics / rounder curves.
 
-For `pixelart`, `mode=polygon` is forced when `smooth_level <= 2`.
-
-### Compression (`compression_level`)
+### Compression
 
 | Level | Behavior |
 |-------|----------|
-| 0 | Passthrough |
-| 1 | Strip metadata / comments / whitespace |
-| 2 | + numeric precision + structural cleanup (default) |
-| 3 | More aggressive path/group minify |
-
-Scour failures are fail-soft: the original SVG is returned. Output is **never rasterized**.
-
-## Photo mode honesty
-
-`preset=photo` (and any request with explicit `max_colors`) runs a preprocess inspired by Vectorizer.io / Vector Magic **controls** (not their tracers):
-
-1. Optional flatten alpha → white
-2. 2× **LANCZOS** upscale if long edge &lt; 800px (photo only)
-3. Light median denoise (default on for photo)
-4. Pillow median-cut quantize (photo defaults: low=12, medium=24, high=40; no dither)
-5. Color merge (similar palette collapse — Vectorizer.io `colormergefactor` analogue)
-6. Logo/illustration AA fringe snap (rare blend pixels → nearest flat)
-7. At `smooth_level` 4–5, slight Gaussian soften before tracing
-8. VTracer color stacked tracing with stronger spline params at higher smooth levels
-
-Expect a **posterized / illustrated** look. Soft gradients, photographic detail, and soft alpha will not survive intact.
-
-Commercial tools still ahead on: sub-pixel boundary placement from anti-aliasing (Vector Magic), true `roundness` / overlap solvers (Vectorizer.io), and interactive segmentation editing. We approximate their *controls* on top of stable VTracer 0.6.x.
+| 0 | `optimize=0`, no Scour |
+| 1 | `optimize=1` |
+| 2 | `optimize=2` (default) |
+| 3 | `optimize=2` + aggressive Scour (fail-soft) |
 
 ## Strengths & limits
 
-**Strengths:** logos, icons, flat art, line art, pixel art, stylized photos.  
-**Limits:** photographs, antialiased text, soft gradients, soft alpha / feathered edges.
+**Strengths:** logos, icons, flat art, line art, pixel art, stylized photos (watershed).  
+**Limits:** continuous-tone photography, antialiased text, soft gradients, soft alpha. Alpha is still a VTracer caveat — use `flatten_transparency=true` when needed.
 
-## Configuration
+## Config
 
-See `.env.example`:
-
-```env
-APP_NAME=raster-to-svg
-APP_VERSION=0.1.0
-MAX_FILE_SIZE_MB=20
-MAX_IMAGE_WIDTH=10000
-MAX_IMAGE_HEIGHT=10000
-MAX_IMAGE_PIXELS=50000000
-MAX_CONCURRENT_JOBS=2
-API_KEY_REQUIRED=false
-API_KEY=
-ALLOW_ORIGINS=*
-LOG_LEVEL=INFO
-```
-
-When `API_KEY_REQUIRED=true`, send `Authorization: Bearer <key>` or `X-API-Key: <key>`.
+See `.env.example` (`MAX_FILE_SIZE_MB`, `MAX_CONCURRENT_JOBS`, optional `API_KEY`, etc.).
 
 ## CLI & benchmark
 
 ```bash
-python -m app.cli examples/logo.png /tmp/out.svg --preset logo --detail medium
+python -m app.cli examples/logo.png /tmp/out.svg --preset logo --smooth-level 4
 python -m app.cli examples/photo_sample.png /tmp/photo.svg --preset photo --detail medium --max-colors 24
-
 python -m app.benchmark examples/ --preset photo --detail low
 ```
 
@@ -183,30 +131,10 @@ python -m app.benchmark examples/ --preset photo --detail low
 pytest
 ```
 
-## Performance notes
+## Alpha caveat
 
-- Default concurrency is intentionally low (`MAX_CONCURRENT_JOBS=2`) for CPU-bound tracing.
-- Large photos with high detail / color counts are slower and produce larger SVGs.
-- Prefer `lineart` / binary for B/W scans; prefer `logo` for flat graphics.
+`1.0.0a4` is a pre-release. APIs may change before a stable 1.0.0. This project pins the exact wheel and prefers the real installed API over assumptions.
 
-## Future architecture (not implemented)
+## Future
 
-This service is designed to sit behind a gateway later:
-
-```text
-gateway → raster-to-svg (this) | image-* | data-*
-```
-
-Do not expand this repo into empty sibling APIs until needed. Queueing can wrap the existing sync `vectorizer.vectorize()` without changing its signature.
-
-## VTracer 0.6 notes
-
-- Only `convert_raw_image_to_svg` is used (in-memory).
-- Package version is resolved via `importlib.metadata` (`__version__` is absent on 0.6.15).
-- SVG comments may still say `VTracer 0.6.12` even when the wheel is `0.6.15`.
-- `length_threshold` must stay in `[3.5, 10]` per the binding docs.
-- Soft transparency handling is limited; use `flatten_transparency=true` when alpha is decorative.
-
-## License
-
-Use freely in your own projects. VTracer and Scour retain their respective licenses.
+Gateway → this service | other image APIs. Queue can wrap sync `vectorizer.vectorize()` unchanged.
