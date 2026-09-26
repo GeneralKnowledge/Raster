@@ -161,7 +161,26 @@ python -m app.benchmark examples/ --preset photo --detail low
 pytest
 ```
 
-## Alpha caveat
+### Similarity / quality (eval only)
+
+Irony accepted: to score resemblance we rasterize the SVG **only in tests/eval**,
+never in the production optimizer.
+
+Metrics: **SSIM** (higher better), **MAE** (lower better), **PSNR**.
+
+```bash
+# automated floors by preset
+pytest tests/test_similarity.py -s
+
+# human-readable report
+python -m app.similarity examples/ --preset logo
+python -m app.similarity examples/photo_sample.png --preset photo --ab
+```
+
+Preset SSIM floors (vs preprocessed source): logo 0.82, illustration 0.75,
+pixelart 0.70, lineart 0.55, photo 0.35 (stylized on purpose).
+
+## Strengths & limits
 
 `1.0.0a4` is a pre-release. APIs may change before a stable 1.0.0. This project pins the exact wheel and prefers the real installed API over assumptions.
 

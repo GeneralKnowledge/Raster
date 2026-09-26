@@ -9,3 +9,7 @@ scour>=0.38.2
 defusedxml>=0.7.1
 pytest>=8.3.0
 httpx>=0.27.0
+# Quality / similarity eval (test + python -m app.similarity only; not used in API)
+cairosvg>=2.7.0
+scikit-image>=0.24.0
+numpy>=1.26.0
