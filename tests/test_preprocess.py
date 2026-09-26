@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from app.services.image import validate_and_normalize
 from app.services.preprocess import (
@@ -30,9 +31,7 @@ def test_denoise_defaults() -> None:
     assert resolve_denoise("logo", True) is True
 
 
-def test_photo_quantize(
-    fixtures_dir: Path,
-) -> None:
+def test_photo_quantize_and_lanczos_upscale(fixtures_dir: Path) -> None:
     data = (fixtures_dir / "photo_sample.png").read_bytes()
     normalized = validate_and_normalize(data, "photo_sample.png")
     result = apply_preprocess(
@@ -45,15 +44,14 @@ def test_photo_quantize(
     assert result.quantized is True
     assert result.denoise is True
     assert result.max_colors == PHOTO_MAX_COLORS["low"]
-    # Upscaled because long edge 120 < 800
     assert result.upscaled is True
     assert result.width == normalized.width * 2
 
-    with Image.open(__import__("io").BytesIO(result.png_bytes)) as img:
-        # Palette size after quantize should be bounded
+    with Image.open(io.BytesIO(result.png_bytes)) as img:
         colors = img.convert("RGB").getcolors(maxcolors=256)
         assert colors is not None
-        assert len(colors) <= 12 + 2  # small slack for alpha compositing edges
+        # After quantize + merge, should be well under the budget
+        assert len(colors) <= 12 + 4
 
 
 def test_logo_no_quantize_by_default(fixtures_dir: Path) -> None:
@@ -92,7 +90,50 @@ def test_flatten_transparency(fixtures_dir: Path) -> None:
         flatten_transparency=True,
     )
     assert result.flattened is True
-    with Image.open(__import__("io").BytesIO(result.png_bytes)) as img:
-        # Corner should be opaque white-ish after flatten
+    with Image.open(io.BytesIO(result.png_bytes)) as img:
         corner = img.convert("RGBA").getpixel((0, 0))
+        assert corner is not None
         assert corner[3] == 255
+
+
+def test_aa_fringe_snap_for_logo() -> None:
+    """Rare fringe colors near a flat logo should be snapped away."""
+    img = Image.new("RGB", (64, 64), (255, 255, 255))
+    d = ImageDraw.Draw(img)
+    d.rectangle([8, 8, 55, 55], fill=(20, 80, 200))
+    # Sprinkle AA-like fringe pixels
+    px = img.load()
+    assert px is not None
+    for i in range(8, 56):
+        px[i, 8] = (120, 160, 220)  # rare edge blend
+        px[8, i] = (90, 140, 210)
+
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    result = apply_preprocess(buf.getvalue(), preset="logo", detail="medium")
+    assert result.fringe_cleaned is True
+
+    with Image.open(io.BytesIO(result.png_bytes)) as out:
+        colors = out.convert("RGB").getcolors(maxcolors=256)
+        assert colors is not None
+        assert len(colors) <= 4
+
+
+def test_high_smooth_softens_edges(fixtures_dir: Path) -> None:
+    data = (fixtures_dir / "logo.png").read_bytes()
+    soft = apply_preprocess(
+        data, preset="illustration", detail="medium", smooth_level=5
+    )
+    plain = apply_preprocess(
+        data, preset="illustration", detail="medium", smooth_level=2
+    )
+    assert soft.edge_softened is True
+    assert plain.edge_softened is False
+
+
+def test_pixelart_skips_edge_soften(fixtures_dir: Path) -> None:
+    data = (fixtures_dir / "pixel.png").read_bytes()
+    result = apply_preprocess(
+        data, preset="pixelart", detail="medium", smooth_level=5
+    )
+    assert result.edge_softened is False

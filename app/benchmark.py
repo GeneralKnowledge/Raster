@@ -76,6 +76,7 @@ def main(argv: list[str] | None = None) -> int:
                 preset=args.preset,
                 detail=args.detail,
                 max_colors=args.max_colors,
+                smooth_level=args.smooth_level,
             )
             resolved = presets.resolve(
                 args.preset, args.smooth_level, args.detail

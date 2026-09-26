@@ -62,6 +62,7 @@ def main(argv: list[str] | None = None) -> int:
             max_colors=args.max_colors,
             denoise=args.denoise,
             flatten_transparency=args.flatten_transparency,
+            smooth_level=args.smooth_level,
         )
         resolved = presets.resolve(args.preset, args.smooth_level, args.detail)
         svg = vectorizer.vectorize(pre.png_bytes, **resolved.kwargs)
