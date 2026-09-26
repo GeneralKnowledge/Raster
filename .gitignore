@@ -19,5 +19,5 @@ htmlcov/
 *.svg
 !tests/fixtures/**
 !examples/**
-.idea/
-.vscode/
+!examples/**/*.svg
+artifacts/

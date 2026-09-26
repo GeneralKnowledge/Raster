@@ -19,4 +19,4 @@ def test_version(client: TestClient) -> None:
     assert r.status_code == 200
     data = r.json()
     assert data["api_version"] == "0.1.0"
-    assert data["vtracer_version"].startswith("0.6.")
+    assert data["vtracer_version"].startswith("1.")

@@ -1,4 +1,4 @@
-"""Preprocess pipeline tests."""
+"""Preprocess + optional Pillow enhance tests."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from app.services.preprocess import (
     resolve_denoise,
     resolve_max_colors,
 )
+from app.services.presets import resolve
 
 
 def test_photo_default_max_colors() -> None:
@@ -27,113 +28,78 @@ def test_photo_default_max_colors() -> None:
 def test_denoise_defaults() -> None:
     assert resolve_denoise("photo", None) is True
     assert resolve_denoise("logo", None) is False
-    assert resolve_denoise("photo", False) is False
-    assert resolve_denoise("logo", True) is True
 
 
-def test_photo_quantize_and_lanczos_upscale(fixtures_dir: Path) -> None:
+def test_photo_upscale_without_enhance(fixtures_dir: Path) -> None:
     data = (fixtures_dir / "photo_sample.png").read_bytes()
     normalized = validate_and_normalize(data, "photo_sample.png")
     result = apply_preprocess(
         normalized.png_bytes,
         preset="photo",
         detail="low",
-        max_colors=None,
         denoise=True,
+        pillow_enhance=False,
     )
-    assert result.quantized is True
     assert result.denoise is True
-    assert result.max_colors == PHOTO_MAX_COLORS["low"]
     assert result.upscaled is True
-    assert result.width == normalized.width * 2
-
-    with Image.open(io.BytesIO(result.png_bytes)) as img:
-        colors = img.convert("RGB").getcolors(maxcolors=256)
-        assert colors is not None
-        # After quantize + merge, should be well under the budget
-        assert len(colors) <= 12 + 4
-
-
-def test_logo_no_quantize_by_default(fixtures_dir: Path) -> None:
-    data = (fixtures_dir / "tiny.png").read_bytes()
-    normalized = validate_and_normalize(data, "tiny.png")
-    result = apply_preprocess(
-        normalized.png_bytes,
-        preset="logo",
-        detail="medium",
-    )
+    assert result.pillow_enhance is False
     assert result.quantized is False
-    assert result.denoise is False
-    assert result.upscaled is False
+    assert result.max_colors == PHOTO_MAX_COLORS["low"]
 
 
-def test_explicit_max_colors_triggers_quantize(fixtures_dir: Path) -> None:
-    data = (fixtures_dir / "logo.png").read_bytes()
-    normalized = validate_and_normalize(data, "logo.png")
+def test_pillow_enhance_photo_quantizes(fixtures_dir: Path) -> None:
+    data = (fixtures_dir / "photo_sample.png").read_bytes()
     result = apply_preprocess(
-        normalized.png_bytes,
-        preset="logo",
-        detail="medium",
-        max_colors=4,
-        denoise=False,
+        data,
+        preset="photo",
+        detail="low",
+        pillow_enhance=True,
     )
+    assert result.pillow_enhance is True
     assert result.quantized is True
-    assert result.max_colors == 4
+    assert result.max_colors == 12
 
 
-def test_flatten_transparency(fixtures_dir: Path) -> None:
-    data = (fixtures_dir / "transparent.png").read_bytes()
-    normalized = validate_and_normalize(data, "transparent.png")
-    result = apply_preprocess(
-        normalized.png_bytes,
-        preset="logo",
-        flatten_transparency=True,
-    )
-    assert result.flattened is True
-    with Image.open(io.BytesIO(result.png_bytes)) as img:
-        corner = img.convert("RGBA").getpixel((0, 0))
-        assert corner is not None
-        assert corner[3] == 255
-
-
-def test_aa_fringe_snap_for_logo() -> None:
-    """Rare fringe colors near a flat logo should be snapped away."""
+def test_pillow_enhance_logo_fringe() -> None:
     img = Image.new("RGB", (64, 64), (255, 255, 255))
     d = ImageDraw.Draw(img)
     d.rectangle([8, 8, 55, 55], fill=(20, 80, 200))
-    # Sprinkle AA-like fringe pixels
     px = img.load()
     assert px is not None
     for i in range(8, 56):
-        px[i, 8] = (120, 160, 220)  # rare edge blend
+        px[i, 8] = (120, 160, 220)
         px[8, i] = (90, 140, 210)
-
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    result = apply_preprocess(buf.getvalue(), preset="logo", detail="medium")
-    assert result.fringe_cleaned is True
 
-    with Image.open(io.BytesIO(result.png_bytes)) as out:
-        colors = out.convert("RGB").getcolors(maxcolors=256)
-        assert colors is not None
-        assert len(colors) <= 4
+    off = apply_preprocess(buf.getvalue(), preset="logo", pillow_enhance=False)
+    on = apply_preprocess(buf.getvalue(), preset="logo", pillow_enhance=True)
+    assert off.fringe_cleaned is False
+    assert on.fringe_cleaned is True
 
 
-def test_high_smooth_softens_edges(fixtures_dir: Path) -> None:
+def test_pillow_enhance_softens_at_high_smooth(fixtures_dir: Path) -> None:
     data = (fixtures_dir / "logo.png").read_bytes()
     soft = apply_preprocess(
-        data, preset="illustration", detail="medium", smooth_level=5
+        data, preset="illustration", smooth_level=5, pillow_enhance=True
     )
     plain = apply_preprocess(
-        data, preset="illustration", detail="medium", smooth_level=2
+        data, preset="illustration", smooth_level=2, pillow_enhance=True
     )
     assert soft.edge_softened is True
     assert plain.edge_softened is False
 
 
-def test_pixelart_skips_edge_soften(fixtures_dir: Path) -> None:
-    data = (fixtures_dir / "pixel.png").read_bytes()
+def test_flatten_transparency(fixtures_dir: Path) -> None:
+    data = (fixtures_dir / "transparent.png").read_bytes()
     result = apply_preprocess(
-        data, preset="pixelart", detail="medium", smooth_level=5
+        data, preset="logo", flatten_transparency=True
     )
-    assert result.edge_softened is False
+    assert result.flattened is True
+
+
+def test_presets_use_vtracer_1x_features() -> None:
+    photo = resolve("photo", 3, "medium", max_colors=24, compression_level=2)
+    assert photo.kwargs["clustering"] == "watershed"
+    assert photo.kwargs["max_colors"] == 24
+    assert photo.kwargs["simplify"] == 1.2

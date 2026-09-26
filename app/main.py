@@ -29,8 +29,9 @@ def create_app() -> FastAPI:
         title="Raster to SVG",
         description=(
             "Convert raster images (PNG, JPEG, WebP, BMP) into editable SVG "
-            "using stable VTracer 0.6.x. Photo mode produces a stylized poster "
-            "/ illustration — not continuous-tone photographic fidelity."
+            "using VTracer 1.x (currently 1.0.0a4). Photo mode uses watershed "
+            "clustering for stylized poster / illustration output — not "
+            "continuous-tone photographic fidelity."
         ),
         version=settings.app_version,
         docs_url="/docs",
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
             "X-Detail",
             "X-Denoise",
             "X-Max-Colors",
+            "X-Pillow-Enhance",
             "Content-Disposition",
         ],
     )

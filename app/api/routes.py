@@ -75,6 +75,7 @@ def _common_headers(
     detail: str,
     denoise: bool,
     max_colors: int | None,
+    pillow_enhance: bool,
 ) -> dict[str, str]:
     headers = {
         "X-Request-Id": request_id,
@@ -86,6 +87,7 @@ def _common_headers(
         "X-Compression-Level": str(compression_level),
         "X-Detail": detail,
         "X-Denoise": "true" if denoise else "false",
+        "X-Pillow-Enhance": "true" if pillow_enhance else "false",
     }
     if max_colors is not None:
         headers["X-Max-Colors"] = str(max_colors)
@@ -103,6 +105,7 @@ async def _run_vectorize_pipeline(
     max_colors: int | None,
     denoise: bool | None,
     flatten_transparency: bool,
+    pillow_enhance: bool,
     settings: Settings,
 ) -> dict[str, Any]:
     started = time.perf_counter()
@@ -123,21 +126,40 @@ async def _run_vectorize_pipeline(
         denoise=denoise,
         flatten_transparency=flatten_transparency,
         smooth_level=smooth_level,
+        pillow_enhance=pillow_enhance,
     )
 
-    resolved = presets.resolve(preset, smooth_level, detail)
+    resolved = presets.resolve(
+        preset,
+        smooth_level,
+        detail,
+        max_colors=max_colors,
+        compression_level=compression_level,
+    )
+
+    # If Pillow already quantized, drop VTracer max_colors to avoid double posterize
+    vkwargs = dict(resolved.kwargs)
+    effective_max_colors = resolved.max_colors
+    if pre.quantized and "max_colors" in vkwargs:
+        del vkwargs["max_colors"]
+        # Still report the Pillow budget that was applied
+        effective_max_colors = pre.max_colors
 
     svg = await asyncio.to_thread(
         vectorizer.vectorize,
         pre.png_bytes,
-        **resolved.kwargs,
+        **vkwargs,
     )
 
+    # Scour only for aggressive level 3; 0–2 use native Config.optimize
+    scour_level = compression_level if compression_level >= 3 else 0
     optimized_svg, was_optimized = await asyncio.to_thread(
         optimizer.optimize_safe,
         svg,
-        compression_level,
+        scour_level,
     )
+    if resolved.optimize > 0:
+        was_optimized = True
 
     elapsed_ms = (time.perf_counter() - started) * 1000.0
     out_name = svg_output_filename(normalized.filename)
@@ -153,12 +175,17 @@ async def _run_vectorize_pipeline(
         "optimized": was_optimized,
         "processing_ms": elapsed_ms,
         "denoise": pre.denoise,
-        "max_colors": pre.max_colors,
+        "max_colors": effective_max_colors,
         "preset": preset,
         "smooth_level": smooth_level,
         "compression_level": compression_level,
         "detail": detail,
         "flatten_transparency": flatten_transparency,
+        "pillow_enhance": pre.pillow_enhance,
+        "quantized": pre.quantized,
+        "color_merged": pre.color_merged,
+        "fringe_cleaned": pre.fringe_cleaned,
+        "edge_softened": pre.edge_softened,
     }
 
 
@@ -210,6 +237,13 @@ async def vectorize_endpoint(
         None,
         description="Alias: false → compression_level=0.",
     ),
+    pillow_enhance: str | None = Form(
+        None,
+        description=(
+            "Optional Pillow enhance (quantize/merge/fringe/soften) for A/B vs "
+            "native VTracer 1.x. Default from PILLOW_ENHANCE env (false)."
+        ),
+    ),
 ) -> Response:
     try:
         return await _handle_vectorize(
@@ -226,6 +260,7 @@ async def vectorize_endpoint(
             response_format=response_format,
             smooth=smooth,
             compress=compress,
+            pillow_enhance=pillow_enhance,
         )
     finally:
         await sem.release()
@@ -246,6 +281,7 @@ async def _handle_vectorize(
     response_format: str,
     smooth: str | None,
     compress: str | None,
+    pillow_enhance: str | None,
 ) -> Response:
     request_id = request_id_var.get("-")
 
@@ -284,6 +320,11 @@ async def _handle_vectorize(
     if flatten is None:
         flatten = False
 
+    enhance_override = _parse_bool(pillow_enhance, "pillow_enhance")
+    enhance = (
+        settings.pillow_enhance if enhance_override is None else enhance_override
+    )
+
     # Bounded read
     max_bytes = settings.max_file_size_bytes
     chunks: list[bytes] = []
@@ -310,6 +351,7 @@ async def _handle_vectorize(
         max_colors=colors,
         denoise=denoise_flag,
         flatten_transparency=flatten,
+        pillow_enhance=enhance,
         settings=settings,
     )
 
@@ -324,6 +366,7 @@ async def _handle_vectorize(
         detail=result["detail"],
         denoise=result["denoise"],
         max_colors=result["max_colors"],
+        pillow_enhance=result["pillow_enhance"],
     )
     headers["Content-Disposition"] = _content_disposition(result["filename"])
 
@@ -352,6 +395,11 @@ async def _handle_vectorize(
                 "max_colors": result["max_colors"],
                 "denoise": result["denoise"],
                 "flatten_transparency": result["flatten_transparency"],
+                "pillow_enhance": result["pillow_enhance"],
+                "quantized": result["quantized"],
+                "color_merged": result["color_merged"],
+                "fringe_cleaned": result["fringe_cleaned"],
+                "edge_softened": result["edge_softened"],
             },
             "meta": {
                 "request_id": request_id,
