@@ -205,7 +205,33 @@ def test_photo_preset(client: TestClient, fixtures_dir) -> None:
     assert _has_vector_content(body["svg"])
     assert body["settings"]["preset"] == "photo"
     assert body["settings"]["max_colors"] == 12
+    assert body["settings"]["pillow_enhance"] is False
     assert r.headers.get("X-Max-Colors") == "12"
+    assert r.headers.get("X-Pillow-Enhance") == "false"
+
+
+def test_pillow_enhance_toggle(client: TestClient, tiny_png: bytes) -> None:
+    off = client.post(
+        "/v1/vectorize",
+        files={"file": ("tiny.png", tiny_png, "image/png")},
+        data={"response_format": "json", "pillow_enhance": "false"},
+    )
+    on = client.post(
+        "/v1/vectorize",
+        files={"file": ("tiny.png", tiny_png, "image/png")},
+        data={
+            "preset": "logo",
+            "response_format": "json",
+            "pillow_enhance": "true",
+            "smooth_level": "5",
+        },
+    )
+    assert off.status_code == 200
+    assert on.status_code == 200
+    assert off.json()["settings"]["pillow_enhance"] is False
+    assert on.json()["settings"]["pillow_enhance"] is True
+    assert on.headers["X-Pillow-Enhance"] == "true"
+    assert _has_vector_content(on.json()["svg"])
 
 
 def test_invalid_preset(client: TestClient, tiny_png: bytes) -> None:

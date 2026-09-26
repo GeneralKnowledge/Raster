@@ -1,8 +1,7 @@
-"""Light preprocess — prefer VTracer 1.x native max_colors / simplify / optimize.
+"""Preprocess pipeline: light hygiene + optional Pillow enhance.
 
-Kept minimal on purpose: flatten transparency, optional denoise, and photo
-upscale for tiny inputs. Heavy Pillow posterize / fringe / soften logic was
-removed in favor of Config.max_colors, watershed, and simplify.
+Default path trusts VTracer 1.x (max_colors / simplify / watershed).
+Optional enhance lives in ``preprocess_pillow.py`` for easy A/B and removal.
 """
 
 from __future__ import annotations
@@ -27,6 +26,12 @@ class PreprocessResult:
     denoise: bool
     flattened: bool
     upscaled: bool
+    # Optional Pillow enhance telemetry (always present; false when disabled)
+    pillow_enhance: bool = False
+    quantized: bool = False
+    color_merged: bool = False
+    fringe_cleaned: bool = False
+    edge_softened: bool = False
 
 
 def resolve_denoise(
@@ -46,22 +51,30 @@ def apply_preprocess(
     max_colors: int | None = None,
     denoise: bool | None = None,
     flatten_transparency: bool = False,
-    smooth_level: int = 3,  # kept for API compat; unused in slim pipeline
+    smooth_level: int = 3,
+    pillow_enhance: bool = False,
 ) -> PreprocessResult:
-    """Light hygiene only; color budget is handled by VTracer ``max_colors``."""
-    del smooth_level  # reserved / API-compat
+    """Validate-ready PNG hygiene, optionally followed by Pillow enhance."""
     effective_colors = resolve_max_colors(preset, detail, max_colors)
     do_denoise = resolve_denoise(preset, denoise)
-    needs_work = flatten_transparency or do_denoise or preset == "photo"
+    needs_work = (
+        flatten_transparency
+        or do_denoise
+        or preset == "photo"
+        or pillow_enhance
+    )
 
     with Image.open(io.BytesIO(png_bytes)) as img:
         img = img.convert("RGBA")
         width, height = img.size
         flattened = False
         upscaled = False
+        quantized = False
+        color_merged = False
+        fringe_cleaned = False
+        edge_softened = False
 
         if not needs_work:
-            # Always re-encode so callers can safely pass format="png" to VTracer
             out = io.BytesIO()
             img.save(out, format="PNG")
             return PreprocessResult(
@@ -96,6 +109,24 @@ def apply_preprocess(
             img = rgb.convert("RGBA")
             img.putalpha(alpha)
 
+        if pillow_enhance:
+            # Isolated import so deleting preprocess_pillow.py is obvious at call site
+            from app.services.preprocess_pillow import apply_pillow_enhance
+
+            enhanced = apply_pillow_enhance(
+                img,
+                preset=preset,
+                detail=detail,
+                max_colors=effective_colors,
+                smooth_level=smooth_level,
+            )
+            img = enhanced.image
+            quantized = enhanced.quantized
+            color_merged = enhanced.color_merged
+            fringe_cleaned = enhanced.fringe_cleaned
+            edge_softened = enhanced.edge_softened
+            width, height = img.size
+
         out = io.BytesIO()
         img.save(out, format="PNG")
         return PreprocessResult(
@@ -106,10 +137,14 @@ def apply_preprocess(
             denoise=do_denoise,
             flattened=flattened,
             upscaled=upscaled,
+            pillow_enhance=pillow_enhance,
+            quantized=quantized,
+            color_merged=color_merged,
+            fringe_cleaned=fringe_cleaned,
+            edge_softened=edge_softened,
         )
 
 
-# Re-export for tests that import from preprocess historically
 __all__ = [
     "PHOTO_MAX_COLORS",
     "PHOTO_UPSCALE_MIN_EDGE",

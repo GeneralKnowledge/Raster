@@ -56,6 +56,7 @@ def create_app() -> FastAPI:
             "X-Detail",
             "X-Denoise",
             "X-Max-Colors",
+            "X-Pillow-Enhance",
             "Content-Disposition",
         ],
     )

@@ -108,6 +108,36 @@ curl -sS -X POST "http://localhost:8000/v1/vectorize" \
 | 2 | `optimize=2` (default) |
 | 3 | `optimize=2` + aggressive Scour (fail-soft) |
 
+## Optional Pillow enhance (A/B)
+
+Native VTracer 1.x is the default. An optional Pillow path can be toggled for
+comparison (quantize / color-merge / AA fringe / edge soften):
+
+```bash
+# env default
+PILLOW_ENHANCE=false
+
+# per request
+curl -F "file=@examples/logo.png" -F "pillow_enhance=true" \
+  http://localhost:8000/v1/vectorize -o with_pillow.svg
+
+# CLI A/B
+python -m app.cli examples/logo.png /tmp/off.svg --no-pillow-enhance
+python -m app.cli examples/logo.png /tmp/on.svg --pillow-enhance
+python -m app.benchmark examples/ --preset photo --pillow-enhance
+python -m app.benchmark examples/ --preset photo --no-pillow-enhance
+```
+
+When Pillow quantize runs, VTracer `max_colors` is skipped for that request to
+avoid double posterizing. Response header: `X-Pillow-Enhance`.
+
+### Removing Pillow enhance if useless
+
+1. Leave `PILLOW_ENHANCE=false` / never send `pillow_enhance=true`
+2. Delete `app/services/preprocess_pillow.py`
+3. Remove the `pillow_enhance` branch/import in `preprocess.py`
+4. Grep for `pillow_enhance` / `PILLOW_ENHANCE` and drop form/CLI/env/docs
+
 ## Strengths & limits
 
 **Strengths:** logos, icons, flat art, line art, pixel art, stylized photos (watershed).  

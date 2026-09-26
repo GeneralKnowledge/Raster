@@ -36,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--smooth-level", type=int, default=3, choices=range(0, 6))
     p.add_argument("--compression-level", type=int, default=2, choices=range(0, 4))
     p.add_argument("--max-colors", type=int, default=None)
+    p.add_argument(
+        "--pillow-enhance",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="A/B optional Pillow enhance (default from PILLOW_ENHANCE env).",
+    )
     return p
 
 
@@ -43,6 +49,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings = get_settings()
     setup_logging(settings.log_level)
+    enhance = (
+        settings.pillow_enhance
+        if args.pillow_enhance is None
+        else args.pillow_enhance
+    )
 
     if not args.folder.is_dir():
         print(f"Not a directory: {args.folder}", file=sys.stderr)
@@ -59,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
 
     header = (
         f"{'file':<24} {'dims':>11} {'in_B':>8} {'ms':>8} "
-        f"{'preset':<12} {'detail':<6} {'svg_B':>8} {'ratio':>7} {'paths':>6}"
+        f"{'preset':<12} {'detail':<6} {'enh':>3} {'svg_B':>8} {'ratio':>7} {'paths':>6}"
     )
     print(header)
     print("-" * len(header))
@@ -77,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
                 detail=args.detail,
                 max_colors=args.max_colors,
                 smooth_level=args.smooth_level,
+                pillow_enhance=enhance,
             )
             resolved = presets.resolve(
                 args.preset,
@@ -85,7 +97,10 @@ def main(argv: list[str] | None = None) -> int:
                 max_colors=args.max_colors,
                 compression_level=args.compression_level,
             )
-            svg = vectorizer.vectorize(pre.png_bytes, **resolved.kwargs)
+            vkwargs = dict(resolved.kwargs)
+            if pre.quantized and "max_colors" in vprops:
+                del vprops["max_colors"]
+            svg = vectorizer.vectorize(pre.png_bytes, **vprops)
             scour_level = (
                 args.compression_level if args.compression_level >= 3 else 0
             )
@@ -99,9 +114,10 @@ def main(argv: list[str] | None = None) -> int:
         out_size = len(svg.encode("utf-8"))
         ratio = (out_size / in_size) if in_size else 0.0
         dims = f"{pre.width}x{pre.height}"
+        enh = "on" if enhance else "off"
         print(
             f"{path.name:<24} {dims:>11} {in_size:8d} {elapsed_ms:8.1f} "
-            f"{args.preset:<12} {args.detail:<6} {out_size:8d} {ratio:7.2f} "
+            f"{args.preset:<12} {args.detail:<6} {enh:>3} {out_size:8d} {ratio:7.2f} "
             f"{count_paths(svg):6d}"
         )
 

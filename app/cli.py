@@ -17,7 +17,7 @@ from app.services.image import validate_and_normalize
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m app.cli",
-        description="Convert a raster image to SVG (VTracer 0.6.x).",
+        description="Convert a raster image to SVG (VTracer 1.x).",
     )
     p.add_argument("input", type=Path, help="Input raster image path")
     p.add_argument("output", type=Path, help="Output SVG path")
@@ -36,6 +36,15 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=False,
     )
+    p.add_argument(
+        "--pillow-enhance",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Optional Pillow enhance for A/B vs native VTracer. "
+            "Default from PILLOW_ENHANCE env."
+        ),
+    )
     return p
 
 
@@ -43,6 +52,11 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings = get_settings()
     setup_logging(settings.log_level)
+    enhance = (
+        settings.pillow_enhance
+        if args.pillow_enhance is None
+        else args.pillow_enhance
+    )
 
     if not args.input.is_file():
         print(f"Input not found: {args.input}", file=sys.stderr)
@@ -63,6 +77,7 @@ def main(argv: list[str] | None = None) -> int:
             denoise=args.denoise,
             flatten_transparency=args.flatten_transparency,
             smooth_level=args.smooth_level,
+            pillow_enhance=enhance,
         )
         resolved = presets.resolve(
             args.preset,
@@ -71,7 +86,10 @@ def main(argv: list[str] | None = None) -> int:
             max_colors=args.max_colors,
             compression_level=args.compression_level,
         )
-        svg = vectorizer.vectorize(pre.png_bytes, **resolved.kwargs)
+        vkwargs = dict(resolved.kwargs)
+        if pre.quantized and "max_colors" in vkwargs:
+            del vkwargs["max_colors"]
+        svg = vectorizer.vectorize(pre.png_bytes, **vkwargs)
         scour_level = args.compression_level if args.compression_level >= 3 else 0
         svg, _ = optimizer.optimize_safe(svg, scour_level)
     except AppError as exc:
@@ -83,7 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     elapsed = (time.perf_counter() - started) * 1000.0
     print(
         f"Wrote {args.output} ({len(svg)} bytes) in {elapsed:.1f} ms "
-        f"[preset={args.preset} detail={args.detail}]"
+        f"[preset={args.preset} detail={args.detail} pillow_enhance={enhance}]"
     )
     return 0
 
