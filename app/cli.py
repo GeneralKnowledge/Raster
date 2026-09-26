@@ -41,8 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=None,
         help=(
-            "Optional Pillow enhance for A/B vs native VTracer. "
-            "Default from PILLOW_ENHANCE env."
+            "Pillow enhance override. Default auto: on for photo, off otherwise "
+            "(env PILLOW_ENHANCE=auto|always|never)."
         ),
     )
     return p
@@ -52,10 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings = get_settings()
     setup_logging(settings.log_level)
-    enhance = (
-        settings.pillow_enhance
-        if args.pillow_enhance is None
-        else args.pillow_enhance
+    enhance = preprocess.resolve_pillow_enhance(
+        args.preset,
+        args.pillow_enhance,
+        mode=settings.pillow_enhance,
     )
 
     if not args.input.is_file():
