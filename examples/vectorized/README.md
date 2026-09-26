@@ -19,6 +19,9 @@ Paired `.png` strips are **Source | SVG re-raster | |diff|×4**.
 | `photo_sample__photo__pillow-on__*` | photo + Pillow enhance |
 | `pixel__pixelart__pillow-off__*` | pixelart preset |
 | `shape__illustration__pillow-off__*` | illustration preset |
+<<<<<<< HEAD
 
 Real-world uploads (portrait, silhouette, chat UI, YouTube comment, ad, clock)
 are under [`user_samples/`](./user_samples/) with comparison strips + SVGs.
+=======
+>>>>>>> origin/main
