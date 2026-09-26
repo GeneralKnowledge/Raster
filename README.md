@@ -172,12 +172,14 @@ Metrics: **SSIM** (higher better), **MAE** (lower better), **PSNR**.
 # automated floors by preset
 pytest tests/test_similarity.py -s
 
-# human-readable report + side-by-side PNGs (source | SVG | |diff|)
+# human-readable report + side-by-side PNGs + SVGs
 python -m app.similarity examples/logo.png --preset logo --out-dir artifacts/similarity
 python -m app.similarity examples/photo_sample.png --preset photo --ab --out-dir artifacts/similarity
 ```
 
-Each comparison strip is labeled: **Source** | **SVG re-raster (SSIM)** | **|diff|×4**.
+Writes paired files per run:
+- `name__preset__pillow-off__ssim-0.966.png` — Source | SVG re-raster | |diff|×4
+- `name__preset__pillow-off__ssim-0.966.svg` — editable vector output
 
 Preset SSIM floors (vs preprocessed source): logo 0.82, illustration 0.75,
 pixelart 0.70, lineart 0.55, photo 0.35 (stylized on purpose).

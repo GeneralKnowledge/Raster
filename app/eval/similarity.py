@@ -37,6 +37,7 @@ class SimilarityReport:
     processing_ok: bool
     notes: str = ""
     comparison_path: str | None = None
+    svg_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,7 @@ class ComparisonBundle:
     rendered: Image.Image
     diff: Image.Image
     side_by_side: Image.Image
+    svg: str = ""
 
 
 def rasterize_svg(
@@ -281,8 +283,11 @@ def vectorize_and_compare(
     flatten_transparency: bool = False,
     out_dir: Path | str | None = None,
 ) -> ComparisonBundle:
-    """Vectorize, score, and build a labeled source | SVG | diff strip."""
-    report, source, rendered, _svg = _run_pipeline(
+    """Vectorize, score, and build a labeled source | SVG | diff strip.
+
+    When ``out_dir`` is set, writes both the comparison PNG and the raw SVG.
+    """
+    report, source, rendered, svg = _run_pipeline(
         data,
         filename,
         preset=preset,
@@ -304,16 +309,25 @@ def vectorize_and_compare(
     )
 
     comparison_path: str | None = None
+    svg_path: str | None = None
     if out_dir is not None:
         out = Path(out_dir)
         out.mkdir(parents=True, exist_ok=True)
         stem = Path(filename).stem
         enh = "pillow-on" if pillow_enhance else "pillow-off"
-        path = out / f"{stem}__{preset}__{enh}__ssim-{report.ssim:.3f}.png"
-        side.save(path, format="PNG")
-        comparison_path = str(path)
+        base = f"{stem}__{preset}__{enh}__ssim-{report.ssim:.3f}"
+        png_path = out / f"{base}.png"
+        svg_out = out / f"{base}.svg"
+        side.save(png_path, format="PNG")
+        svg_out.write_text(svg, encoding="utf-8")
+        comparison_path = str(png_path)
+        svg_path = str(svg_out)
         report = SimilarityReport(
-            **{**report.__dict__, "comparison_path": comparison_path}
+            **{
+                **report.__dict__,
+                "comparison_path": comparison_path,
+                "svg_path": svg_path,
+            }
         )
 
     return ComparisonBundle(
@@ -322,6 +336,7 @@ def vectorize_and_compare(
         rendered=rendered,
         diff=diff,
         side_by_side=side,
+        svg=svg,
     )
 
 
@@ -332,8 +347,13 @@ def format_report(report: SimilarityReport) -> str:
         f"SSIM={report.ssim:.3f} MAE={report.mae:.3f} PSNR={report.psnr:5.1f} "
         f"paths={report.path_count:<4} svg_B={report.svg_bytes}"
     )
+    extras: list[str] = []
     if report.comparison_path:
-        base += f"  → {report.comparison_path}"
+        extras.append(report.comparison_path)
+    if report.svg_path:
+        extras.append(report.svg_path)
+    if extras:
+        base += "  → " + ", ".join(extras)
     return base
 
 

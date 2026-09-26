@@ -52,12 +52,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--out-dir",
         type=Path,
         default=Path("artifacts/similarity"),
-        help="Directory for side-by-side comparison PNGs",
+        help="Directory for comparison PNGs and SVG outputs",
     )
     p.add_argument(
         "--no-images",
         action="store_true",
-        help="Score only; do not write comparison PNGs",
+        help="Score only; do not write comparison PNGs or SVGs",
     )
     return p
 
@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"[{flag}] {format_report(report)}  floor={floor:.2f}")
 
     if out_dir is not None:
-        print(f"\nSide-by-side images written under {out_dir.resolve()}")
+        print(f"\nComparison PNGs + SVGs written under {out_dir.resolve()}")
 
     return 0 if worst_ok else 1
 

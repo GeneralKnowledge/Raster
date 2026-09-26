@@ -125,9 +125,16 @@ def test_side_by_side_comparison_written(tmp_path: Path) -> None:
         out_dir=tmp_path,
     )
     assert bundle.report.comparison_path is not None
+    assert bundle.report.svg_path is not None
     path = Path(bundle.report.comparison_path)
+    svg_path = Path(bundle.report.svg_path)
     assert path.is_file()
+    assert svg_path.is_file()
     assert path.stat().st_size > 100
+    svg_text = svg_path.read_text(encoding="utf-8")
+    assert "<svg" in svg_text.lower()
+    assert "<path" in svg_text.lower()
+    assert bundle.svg.startswith("<?xml") or "<svg" in bundle.svg.lower()
     # Strip is wider than a single panel
     assert bundle.side_by_side.width > bundle.source.width * 2
     assert_similarity_acceptable(bundle.report)
