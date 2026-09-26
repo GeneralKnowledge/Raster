@@ -20,6 +20,16 @@ uvicorn app.main:app --reload
 
 Open docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
+## Experiments
+
+**Double-vectorize** (pass1 → re-raster + reinject original detail → pass2): helps
+*photos* when pass1 is coarser (`--pass1-detail low`), but hurts illustrations.
+See [`examples/double_pass/`](examples/double_pass/) — not enabled on the API by default.
+
+```bash
+python -m app.double_pass photo.jpg --preset photo --pass1-detail low --strength 0.5
+```
+
 ## What it does
 
 1. Validates & normalizes the upload with Pillow (RGBA PNG working buffer)
