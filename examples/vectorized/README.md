@@ -22,3 +22,6 @@ Paired `.png` strips are **Source | SVG re-raster | |diff|×4**.
 
 Real-world uploads (portrait, silhouette, chat UI, YouTube comment, ad, clock)
 are under [`user_samples/`](./user_samples/) with comparison strips + SVGs.
+
+Batch 2 uploads (landscape, IG reel, abstract figure, mushroom cloud, lich) are under
+[`user_samples_batch2/`](./user_samples_batch2/).
