@@ -122,6 +122,7 @@ async def _run_vectorize_pipeline(
         max_colors=max_colors,
         denoise=denoise,
         flatten_transparency=flatten_transparency,
+        smooth_level=smooth_level,
     )
 
     resolved = presets.resolve(preset, smooth_level, detail)
