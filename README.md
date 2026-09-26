@@ -173,9 +173,11 @@ Metrics: **SSIM** (higher better), **MAE** (lower better), **PSNR**.
 pytest tests/test_similarity.py -s
 
 # human-readable report + side-by-side PNGs + SVGs
-python -m app.similarity examples/logo.png --preset logo --out-dir artifacts/similarity
-python -m app.similarity examples/photo_sample.png --preset photo --ab --out-dir artifacts/similarity
+python -m app.similarity examples/logo.png --preset logo --out-dir examples/vectorized
+python -m app.similarity examples/photo_sample.png --preset photo --ab --out-dir examples/vectorized
 ```
+
+Committed samples live in [`examples/vectorized/`](examples/vectorized/) (open the `.svg` files directly).
 
 Writes paired files per run:
 - `name__preset__pillow-off__ssim-0.966.png` — Source | SVG re-raster | |diff|×4
