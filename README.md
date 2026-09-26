@@ -26,7 +26,7 @@ Open docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 2. Light preprocess only: optional flatten alpha, photo upscale, median denoise
 3. Resolves preset + smooth/detail/compression into a VTracer **`Config`**
 4. Calls `Config.convert_bytes(png_bytes, format="png")`
-5. Optional Scour pass only at `compression_level=3` (levels 0–2 use native `optimize`)
+5. SVG minify: VTracer native ``optimize`` (0–2) + matching Scour pass (fail-soft)
 
 CPU work runs in `asyncio.to_thread`. Concurrency capped by `MAX_CONCURRENT_JOBS` (default 2); overflow → `503 busy`.
 
@@ -60,7 +60,7 @@ Also: `/docs`, `/redoc`, `/openapi.json`.
 | `file` | required | PNG, JPEG, WebP, BMP |
 | `preset` | `logo` | `logo` \| `illustration` \| `photo` \| `lineart` \| `pixelart` |
 | `smooth_level` | `3` | `0`–`5` → mode + **`simplify`** tolerance |
-| `compression_level` | `2` | `0`–`2` = native optimize; `3` = optimize + Scour |
+| `compression_level` | `2` | native optimize + Scour minify (0=off … 3=max) |
 | `detail` | `medium` | affects speckles / watershed_detail / photo colors |
 | `max_colors` | auto | passed to Config; photo defaults **16/36/48** by detail |
 | `denoise` | auto | light median; default on for photo |
@@ -104,9 +104,9 @@ curl -sS -X POST "http://localhost:8000/v1/vectorize" \
 | Level | Behavior |
 |-------|----------|
 | 0 | `optimize=0`, no Scour |
-| 1 | `optimize=1` |
-| 2 | `optimize=2` (default) |
-| 3 | `optimize=2` + aggressive Scour (fail-soft) |
+| 1 | `optimize=1` + light Scour (strip metadata/whitespace) |
+| 2 | `optimize=2` + Scour precision/group minify (**default**, ~25–55% smaller) |
+| 3 | `optimize=2` + aggressive Scour (shortest ids / tighter digits) |
 
 ## Pillow enhance (photo-default)
 

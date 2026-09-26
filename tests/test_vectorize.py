@@ -92,6 +92,28 @@ def test_oversized_upload(monkeypatch: pytest.MonkeyPatch, tiny_png: bytes) -> N
     get_settings.cache_clear()
 
 
+def test_default_compression_applies_scour(
+    client: TestClient, tiny_png: bytes
+) -> None:
+    """Default level 2 should Scour-minify (not only native optimize)."""
+    off = client.post(
+        "/v1/vectorize",
+        files={"file": ("tiny.png", tiny_png, "image/png")},
+        data={"compression_level": "0", "response_format": "json"},
+    )
+    default = client.post(
+        "/v1/vectorize",
+        files={"file": ("tiny.png", tiny_png, "image/png")},
+        data={"response_format": "json"},  # compression_level defaults to 2
+    )
+    assert off.status_code == 200 and default.status_code == 200
+    off_svg = off.json()["svg"]
+    def_svg = default.json()["svg"]
+    assert len(def_svg) < len(off_svg)
+    assert default.json()["settings"]["compression_level"] == 2
+    assert default.json()["output"]["optimized"] is True
+
+
 @pytest.mark.parametrize("level", [0, 2, 3])
 def test_compression_levels(
     client: TestClient, tiny_png: bytes, level: int
