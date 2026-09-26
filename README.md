@@ -62,9 +62,10 @@ Also: `/docs`, `/redoc`, `/openapi.json`.
 | `smooth_level` | `3` | `0`–`5` → mode + **`simplify`** tolerance |
 | `compression_level` | `2` | `0`–`2` = native optimize; `3` = optimize + Scour |
 | `detail` | `medium` | affects speckles / watershed_detail / photo colors |
-| `max_colors` | auto | passed to Config; photo defaults 12/24/40 |
+| `max_colors` | auto | passed to Config; photo defaults **16/36/48** by detail |
 | `denoise` | auto | light median; default on for photo |
 | `flatten_transparency` | `false` | flatten soft alpha onto white |
+| `pillow_enhance` | auto | on for `photo` (quantize/merge); override true/false |
 | `response_format` | `svg` | `svg` \| `json` |
 | `smooth` / `compress` | — | aliases to force level 0 |
 
@@ -81,7 +82,6 @@ curl -sS -X POST "http://localhost:8000/v1/vectorize" \
   -F "file=@examples/photo_sample.png" \
   -F "preset=photo" \
   -F "detail=medium" \
-  -F "max_colors=24" \
   -F "response_format=json" | jq '.meta, .settings'
 ```
 
@@ -90,9 +90,9 @@ curl -sS -X POST "http://localhost:8000/v1/vectorize" \
 | Preset | clustering | hierarchical | Notes |
 |--------|------------|--------------|-------|
 | `logo` | color-cluster | stacked | Clean flats + simplify |
-| `illustration` | color-cluster | stacked | Balanced |
-| `photo` | **watershed** | **cutout** | Stylized; native max_colors |
-| `lineart` | **bw** | stacked | Adaptive threshold |
+| `illustration` | color-cluster | stacked | Balanced; prefer for detailed photos/ads when you want structure |
+| `photo` | **watershed** | **cutout** | Stylized poster look; Pillow enhance on by default |
+| `lineart` | **bw** | stacked | Adaptive threshold; use only for true B&W line work |
 | `pixelart` | color-cluster | cutout | Polygon at low smooth |
 
 ### Smoothing
@@ -108,32 +108,32 @@ curl -sS -X POST "http://localhost:8000/v1/vectorize" \
 | 2 | `optimize=2` (default) |
 | 3 | `optimize=2` + aggressive Scour (fail-soft) |
 
-## Optional Pillow enhance (A/B)
+## Pillow enhance (photo-default)
 
-Native VTracer 1.x is the default. An optional Pillow path can be toggled for
-comparison (quantize / color-merge / AA fringe / edge soften):
+Pillow enhance **auto-enables for `photo`** (median-cut quantize + color merge;
+optional soften at `smooth_level` ≥ 4). Other presets stay native VTracer unless
+you override. Non-photo A/B showed ~0 SSIM gain from the old fringe/soften path.
 
 ```bash
-# env default
-PILLOW_ENHANCE=false
+# env: auto | always | never  (aliases: true→always, false→never)
+PILLOW_ENHANCE=auto
 
-# per request
-curl -F "file=@examples/logo.png" -F "pillow_enhance=true" \
-  http://localhost:8000/v1/vectorize -o with_pillow.svg
+# per request overrides
+curl -F "file=@examples/photo_sample.png" -F "preset=photo" \
+  -F "pillow_enhance=false" http://localhost:8000/v1/vectorize -o native.svg
 
-# CLI A/B
-python -m app.cli examples/logo.png /tmp/off.svg --no-pillow-enhance
-python -m app.cli examples/logo.png /tmp/on.svg --pillow-enhance
-python -m app.benchmark examples/ --preset photo --pillow-enhance
+# CLI
+python -m app.cli examples/photo_sample.png /tmp/auto.svg --preset photo
+python -m app.cli examples/photo_sample.png /tmp/off.svg --preset photo --no-pillow-enhance
 python -m app.benchmark examples/ --preset photo --no-pillow-enhance
 ```
 
 When Pillow quantize runs, VTracer `max_colors` is skipped for that request to
 avoid double posterizing. Response header: `X-Pillow-Enhance`.
 
-### Removing Pillow enhance if useless
+### Removing Pillow enhance if unwanted
 
-1. Leave `PILLOW_ENHANCE=false` / never send `pillow_enhance=true`
+1. Set `PILLOW_ENHANCE=never` / always send `pillow_enhance=false`
 2. Delete `app/services/preprocess_pillow.py`
 3. Remove the `pillow_enhance` branch/import in `preprocess.py`
 4. Grep for `pillow_enhance` / `PILLOW_ENHANCE` and drop form/CLI/env/docs

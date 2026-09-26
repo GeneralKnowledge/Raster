@@ -26,9 +26,9 @@ class Settings(BaseSettings):
     api_key: str = Field(default="", alias="API_KEY")
     allow_origins: str = Field(default="*", alias="ALLOW_ORIGINS")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
-    # Optional Pillow enhance (quantize/merge/fringe/soften). Default off so
-    # native VTracer 1.x is the baseline; flip on for A/B. Easy to remove later.
-    pillow_enhance: bool = Field(default=False, alias="PILLOW_ENHANCE")
+    # Pillow enhance mode: auto (on for photo), always, or never.
+    # Accepts true/false aliases. Per-request pillow_enhance overrides this.
+    pillow_enhance: str = Field(default="auto", alias="PILLOW_ENHANCE")
 
     @property
     def max_file_size_bytes(self) -> int:

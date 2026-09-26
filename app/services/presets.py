@@ -20,18 +20,19 @@ SPLICE_THRESHOLD_RANGE = (0, 180)
 PATH_PRECISION_RANGE = (0, 10)
 WATERSHED_DETAIL_RANGE = (1, 512)
 
-# Photo max_colors defaults (native Config.max_colors)
+# Photo max_colors defaults (native Config.max_colors).
+# Raised after user-sample tuning: medium 24 was too posterized.
 PHOTO_MAX_COLORS: dict[DetailLevel, int] = {
-    "low": 12,
-    "medium": 24,
-    "high": 40,
+    "low": 16,
+    "medium": 36,
+    "high": 48,
 }
 
 # Watershed cut levels by detail (higher = more regions)
 PHOTO_WATERSHED_DETAIL: dict[DetailLevel, int] = {
-    "low": 96,
-    "medium": 140,
-    "high": 200,
+    "low": 112,
+    "medium": 168,
+    "high": 220,
 }
 
 # Base presets — 1.x clustering replaces colormode

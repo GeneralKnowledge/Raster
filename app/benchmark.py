@@ -40,7 +40,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--pillow-enhance",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="A/B optional Pillow enhance (default from PILLOW_ENHANCE env).",
+        help=(
+            "Pillow enhance override. Default auto: on for photo "
+            "(env PILLOW_ENHANCE=auto|always|never)."
+        ),
     )
     return p
 
@@ -49,10 +52,10 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     settings = get_settings()
     setup_logging(settings.log_level)
-    enhance = (
-        settings.pillow_enhance
-        if args.pillow_enhance is None
-        else args.pillow_enhance
+    enhance = preprocess.resolve_pillow_enhance(
+        args.preset,
+        args.pillow_enhance,
+        mode=settings.pillow_enhance,
     )
 
     if not args.folder.is_dir():

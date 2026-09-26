@@ -1,7 +1,9 @@
 """Preprocess pipeline: light hygiene + optional Pillow enhance.
 
 Default path trusts VTracer 1.x (max_colors / simplify / watershed).
-Optional enhance lives in ``preprocess_pillow.py`` for easy A/B and removal.
+Pillow enhance auto-enables for ``photo`` (quantize/merge); see
+``resolve_pillow_enhance``. Module lives in ``preprocess_pillow.py`` for
+easy A/B and removal.
 """
 
 from __future__ import annotations
@@ -40,6 +42,29 @@ def resolve_denoise(
 ) -> bool:
     if denoise is not None:
         return denoise
+    return preset == "photo"
+
+
+def resolve_pillow_enhance(
+    preset: PresetName,
+    override: bool | None,
+    *,
+    mode: str = "auto",
+) -> bool:
+    """Decide whether Pillow enhance runs.
+
+    Explicit ``override`` always wins. Otherwise ``mode`` is:
+    - ``auto`` (default): on for ``photo`` only
+    - ``always`` / true-like: on for every preset
+    - ``never`` / false-like: off for every preset
+    """
+    if override is not None:
+        return override
+    normalized = (mode or "auto").strip().lower()
+    if normalized in {"always", "true", "1", "yes", "on"}:
+        return True
+    if normalized in {"never", "false", "0", "no", "off"}:
+        return False
     return preset == "photo"
 
 
@@ -152,4 +177,5 @@ __all__ = [
     "apply_preprocess",
     "resolve_denoise",
     "resolve_max_colors",
+    "resolve_pillow_enhance",
 ]

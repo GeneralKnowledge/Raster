@@ -215,7 +215,9 @@ async def vectorize_endpoint(
     detail: str = Form("medium", description=DETAIL_DESC),
     max_colors: str | None = Form(
         None,
-        description="Optional color limit 2–64. Photo defaults: 12/24/40 by detail.",
+        description=(
+            "Optional color limit 2–64. Photo defaults: 16/36/48 by detail."
+        ),
     ),
     denoise: str | None = Form(
         None,
@@ -240,8 +242,8 @@ async def vectorize_endpoint(
     pillow_enhance: str | None = Form(
         None,
         description=(
-            "Optional Pillow enhance (quantize/merge/fringe/soften) for A/B vs "
-            "native VTracer 1.x. Default from PILLOW_ENHANCE env (false)."
+            "Pillow enhance override (true/false). Default auto: on for photo "
+            "(quantize/merge), off otherwise. Env PILLOW_ENHANCE=auto|always|never."
         ),
     ),
 ) -> Response:
@@ -321,8 +323,10 @@ async def _handle_vectorize(
         flatten = False
 
     enhance_override = _parse_bool(pillow_enhance, "pillow_enhance")
-    enhance = (
-        settings.pillow_enhance if enhance_override is None else enhance_override
+    enhance = preprocess.resolve_pillow_enhance(
+        preset,  # type: ignore[arg-type]
+        enhance_override,
+        mode=settings.pillow_enhance,
     )
 
     # Bounded read

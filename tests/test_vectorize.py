@@ -196,7 +196,7 @@ def test_photo_preset(client: TestClient, fixtures_dir) -> None:
         data={
             "preset": "photo",
             "detail": "low",
-            "max_colors": "12",
+            "max_colors": "16",
             "response_format": "json",
         },
     )
@@ -204,9 +204,29 @@ def test_photo_preset(client: TestClient, fixtures_dir) -> None:
     body = r.json()
     assert _has_vector_content(body["svg"])
     assert body["settings"]["preset"] == "photo"
-    assert body["settings"]["max_colors"] == 12
-    assert body["settings"]["pillow_enhance"] is False
-    assert r.headers.get("X-Max-Colors") == "12"
+    assert body["settings"]["max_colors"] == 16
+    # Photo auto-enables Pillow enhance unless overridden
+    assert body["settings"]["pillow_enhance"] is True
+    assert r.headers.get("X-Max-Colors") == "16"
+    assert r.headers.get("X-Pillow-Enhance") == "true"
+
+
+def test_photo_pillow_enhance_can_be_disabled(
+    client: TestClient, fixtures_dir
+) -> None:
+    data = (fixtures_dir / "photo_sample.png").read_bytes()
+    r = client.post(
+        "/v1/vectorize",
+        files={"file": ("photo_sample.png", data, "image/png")},
+        data={
+            "preset": "photo",
+            "detail": "low",
+            "pillow_enhance": "false",
+            "response_format": "json",
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["settings"]["pillow_enhance"] is False
     assert r.headers.get("X-Pillow-Enhance") == "false"
 
 
