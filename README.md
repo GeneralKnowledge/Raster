@@ -131,12 +131,17 @@ Scour failures are fail-soft: the original SVG is returned. Output is **never ra
 `preset=photo` (and any request with explicit `max_colors`) runs a preprocess inspired by Vectorizer.io / Vector Magic **controls** (not their tracers):
 
 1. Optional flatten alpha → white
-2. 2× upscale if long edge &lt; 800px (photo only)
+2. 2× **LANCZOS** upscale if long edge &lt; 800px (photo only)
 3. Light median denoise (default on for photo)
 4. Pillow median-cut quantize (photo defaults: low=12, medium=24, high=40; no dither)
-5. VTracer color stacked tracing
+5. Color merge (similar palette collapse — Vectorizer.io `colormergefactor` analogue)
+6. Logo/illustration AA fringe snap (rare blend pixels → nearest flat)
+7. At `smooth_level` 4–5, slight Gaussian soften before tracing
+8. VTracer color stacked tracing with stronger spline params at higher smooth levels
 
 Expect a **posterized / illustrated** look. Soft gradients, photographic detail, and soft alpha will not survive intact.
+
+Commercial tools still ahead on: sub-pixel boundary placement from anti-aliasing (Vector Magic), true `roundness` / overlap solvers (Vectorizer.io), and interactive segmentation editing. We approximate their *controls* on top of stable VTracer 0.6.x.
 
 ## Strengths & limits
 

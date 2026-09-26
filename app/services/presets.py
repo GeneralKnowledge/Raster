@@ -55,6 +55,9 @@ PRESETS: dict[PresetName, dict[str, Any]] = {
     },
 }
 
+# Empirically (VTracer 0.6): lower corner_threshold + higher length/splice
+# → fewer cubic segments / smoother outlines. max_iterations helps slightly
+# on complex contours at the high end.
 SMOOTH_LEVELS: dict[int, dict[str, Any]] = {
     0: {
         "mode": "polygon",
@@ -62,6 +65,7 @@ SMOOTH_LEVELS: dict[int, dict[str, Any]] = {
         "length_threshold": 4.0,
         "splice_threshold": 45,
         "path_precision": 8,
+        "max_iterations": 10,
     },
     1: {
         "mode": "spline",
@@ -69,6 +73,7 @@ SMOOTH_LEVELS: dict[int, dict[str, Any]] = {
         "length_threshold": 3.5,
         "splice_threshold": 30,
         "path_precision": 6,
+        "max_iterations": 10,
     },
     2: {
         "mode": "spline",
@@ -76,27 +81,31 @@ SMOOTH_LEVELS: dict[int, dict[str, Any]] = {
         "length_threshold": 3.8,
         "splice_threshold": 35,
         "path_precision": 5,
+        "max_iterations": 10,
     },
     3: {
         "mode": "spline",
-        "corner_threshold": 60,
-        "length_threshold": 4.0,
-        "splice_threshold": 45,
+        "corner_threshold": 55,
+        "length_threshold": 4.5,
+        "splice_threshold": 50,
         "path_precision": 3,
+        "max_iterations": 12,
     },
     4: {
-        "mode": "spline",
-        "corner_threshold": 50,
-        "length_threshold": 5.0,
-        "splice_threshold": 55,
-        "path_precision": 2,
-    },
-    5: {
         "mode": "spline",
         "corner_threshold": 40,
         "length_threshold": 6.0,
         "splice_threshold": 60,
         "path_precision": 2,
+        "max_iterations": 16,
+    },
+    5: {
+        "mode": "spline",
+        "corner_threshold": 30,
+        "length_threshold": 8.0,
+        "splice_threshold": 70,
+        "path_precision": 2,
+        "max_iterations": 20,
     },
 }
 
@@ -179,6 +188,7 @@ def resolve(
         "path_precision": int(
             _clamp(smooth["path_precision"], *PATH_PRECISION_RANGE)
         ),
+        "max_iterations": int(smooth.get("max_iterations", 10)),
     }
 
     return ResolvedPresets(
