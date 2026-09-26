@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Paint by numbers — projector</title>
+<style>
+  html, body { margin:0; height:100%; background:#111; color:#eee;
+    font-family: system-ui, sans-serif; }
+  #stage { position:fixed; inset:0; display:flex; align-items:center;
+    justify-content:center; }
+  #stage object, #stage img { max-width:96vw; max-height:85vh;
+    background:#fff; }
+  #hud { position:fixed; left:0; right:0; bottom:0; padding:12px 16px;
+    background:rgba(0,0,0,.75); display:flex; gap:16px; align-items:center;
+    flex-wrap:wrap; }
+  button { font-size:1rem; padding:.4rem .9rem; cursor:pointer; }
+  .swatch { display:flex; align-items:center; gap:6px; margin:2px 8px 2px 0; }
+  .swatch span { width:18px; height:18px; border:1px solid #666; display:inline-block; }
+  #legend { display:flex; flex-wrap:wrap; max-width:50vw; }
+</style>
+</head>
+<body>
+  <div id="stage"><object id="frame" type="image/svg+xml" data="outline.svg"></object></div>
+  <div id="hud">
+    <button id="prev" type="button">Prev</button>
+    <button id="next" type="button">Next</button>
+    <strong id="label">Outline</strong>
+    <div id="legend"><div class="swatch"><span style="background:#4f140d"></span>1 #4f140d</div><div class="swatch"><span style="background:#210e0c"></span>2 #210e0c</div><div class="swatch"><span style="background:#a43b21"></span>3 #a43b21</div><div class="swatch"><span style="background:#712215"></span>4 #712215</div><div class="swatch"><span style="background:#dd6836"></span>5 #dd6836</div><div class="swatch"><span style="background:#f5cb76"></span>6 #f5cb76</div></div>
+  </div>
+  <script>
+    const slides = ["outline.svg", "numbered.svg", "steps/step_01_color_1.svg", "steps/step_02_color_2.svg", "steps/step_03_color_3.svg", "steps/step_04_color_4.svg", "steps/step_05_color_5.svg", "steps/step_06_color_6.svg"];
+    const names = ["Outline", "Numbered",
+      "Step 1: color 1 (#4f140d)", "Step 2: color 2 (#210e0c)", "Step 3: color 3 (#a43b21)", "Step 4: color 4 (#712215)", "Step 5: color 5 (#dd6836)", "Step 6: color 6 (#f5cb76)"];
+    let i = 0;
+    const frame = document.getElementById("frame");
+    const label = document.getElementById("label");
+    function show(n) {
+      i = (n + slides.length) % slides.length;
+      frame.data = slides[i];
+      label.textContent = names[i];
+    }
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.getElementById("next").onclick = () => show(i + 1);
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === " ") show(i + 1);
+      if (e.key === "ArrowLeft") show(i - 1);
+    });
+  </script>
+</body>
+</html>

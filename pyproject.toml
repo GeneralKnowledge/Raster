@@ -15,6 +15,7 @@ dependencies = [
   "pydantic>=2.9.0,<3.0.0",
   "pydantic-settings>=2.6.0,<3.0.0",
   "Pillow>=10.4.0,<12.0.0",
+  "numpy>=1.26.0",
   "vtracer==1.0.0a4",
   "scour>=0.38.2",
   "defusedxml>=0.7.1",
