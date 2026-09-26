@@ -112,6 +112,27 @@ def test_smooth_level_still_resembles_source() -> None:
         )
 
 
+def test_side_by_side_comparison_written(tmp_path: Path) -> None:
+    data = (FIXTURES / "logo.png").read_bytes()
+    from app.eval.similarity import vectorize_and_compare
+
+    bundle = vectorize_and_compare(
+        data,
+        "logo.png",
+        preset="logo",
+        smooth_level=3,
+        pillow_enhance=False,
+        out_dir=tmp_path,
+    )
+    assert bundle.report.comparison_path is not None
+    path = Path(bundle.report.comparison_path)
+    assert path.is_file()
+    assert path.stat().st_size > 100
+    # Strip is wider than a single panel
+    assert bundle.side_by_side.width > bundle.source.width * 2
+    assert_similarity_acceptable(bundle.report)
+
+
 def test_vector_output_is_not_embedded_raster() -> None:
     """Guard: SVG must be path geometry, not a base64 PNG dump."""
     data = (FIXTURES / "logo.png").read_bytes()

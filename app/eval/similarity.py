@@ -10,9 +10,10 @@ from __future__ import annotations
 import io
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from skimage.metrics import structural_similarity as ssim
 
 from app.services import optimizer, preprocess, presets, vectorizer
@@ -35,6 +36,18 @@ class SimilarityReport:
     svg_bytes: int
     processing_ok: bool
     notes: str = ""
+    comparison_path: str | None = None
+
+
+@dataclass(frozen=True)
+class ComparisonBundle:
+    """In-memory panels + metrics for a single vectorization run."""
+
+    report: SimilarityReport
+    source: Image.Image
+    rendered: Image.Image
+    diff: Image.Image
+    side_by_side: Image.Image
 
 
 def rasterize_svg(
@@ -54,7 +67,6 @@ def rasterize_svg(
         background_color="rgb({},{},{})".format(*background),
     )
     img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
-    # Flatten onto background for stable metrics
     canvas = Image.new("RGBA", img.size, (*background, 255))
     canvas.alpha_composite(img)
     return canvas.convert("RGB")
@@ -75,10 +87,7 @@ def compute_metrics(
     a = _to_float_array(original)
     b = _to_float_array(rendered)
 
-    # channel_axis=2 for RGB; data_range=1.0 since we normalized
-    score = float(
-        ssim(a, b, channel_axis=2, data_range=1.0)
-    )
+    score = float(ssim(a, b, channel_axis=2, data_range=1.0))
     mae = float(np.mean(np.abs(a - b)))
     mse = float(np.mean((a - b) ** 2))
     if mse <= 1e-12:
@@ -88,24 +97,90 @@ def compute_metrics(
     return score, mae, psnr
 
 
+def absolute_diff_image(original: Image.Image, rendered: Image.Image) -> Image.Image:
+    """Per-pixel abs diff, amplified for visibility."""
+    if original.size != rendered.size:
+        rendered = rendered.resize(original.size, Image.Resampling.LANCZOS)
+    a = np.asarray(original.convert("RGB"), dtype=np.float32)
+    b = np.asarray(rendered.convert("RGB"), dtype=np.float32)
+    diff = np.abs(a - b)
+    amplified = np.clip(diff * 4.0, 0, 255).astype(np.uint8)
+    return Image.fromarray(amplified)
+
+
+def _label_panel(img: Image.Image, title: str, *, min_height: int = 28) -> Image.Image:
+    """Stack a text label above an image panel."""
+    pad = 8
+    label_h = max(min_height, 28)
+    canvas = Image.new("RGB", (img.width, img.height + label_h), (245, 245, 245))
+    canvas.paste(img, (0, label_h))
+    draw = ImageDraw.Draw(canvas)
+    try:
+        font = ImageFont.load_default()
+    except Exception:  # noqa: BLE001
+        font = None
+    draw.rectangle([0, 0, img.width, label_h], fill=(32, 32, 32))
+    draw.text((pad, 8), title, fill=(255, 255, 255), font=font)
+    return canvas
+
+
+def build_side_by_side(
+    source: Image.Image,
+    rendered: Image.Image,
+    *,
+    ssim_score: float,
+    mae: float,
+    preset: str,
+    pillow_enhance: bool,
+    gap: int = 8,
+    min_panel_width: int = 240,
+) -> tuple[Image.Image, Image.Image]:
+    """Return (side_by_side RGB, diff RGB). Panels: source | vector | |diff|."""
+    if source.size != rendered.size:
+        rendered = rendered.resize(source.size, Image.Resampling.LANCZOS)
+    diff = absolute_diff_image(source, rendered)
+
+    # Upscale tiny fixtures so comparison strips are readable
+    if source.width < min_panel_width:
+        scale = max(2, (min_panel_width + source.width - 1) // source.width)
+        new_size = (source.width * scale, source.height * scale)
+        source = source.resize(new_size, Image.Resampling.NEAREST)
+        rendered = rendered.resize(new_size, Image.Resampling.NEAREST)
+        diff = diff.resize(new_size, Image.Resampling.NEAREST)
+
+    enh = "pillow on" if pillow_enhance else "pillow off"
+    left = _label_panel(source, f"Source  ({preset})")
+    mid = _label_panel(rendered, f"SVG re-raster  SSIM={ssim_score:.3f}")
+    right = _label_panel(diff, f"|diff|x4  MAE={mae:.3f}  {enh}")
+
+    w = left.width + gap + mid.width + gap + right.width
+    h = max(left.height, mid.height, right.height)
+    out = Image.new("RGB", (w, h), (220, 220, 220))
+    x = 0
+    for panel in (left, mid, right):
+        out.paste(panel, (x, 0))
+        x += panel.width + gap
+    return out, diff
+
+
 def count_paths(svg: str) -> int:
     return len(re.findall(r"<path\b", svg, flags=re.IGNORECASE))
 
 
-def vectorize_and_score(
+def _run_pipeline(
     data: bytes,
     filename: str,
     *,
-    preset: str = "logo",
-    detail: str = "medium",
-    smooth_level: int = 3,
-    compression_level: int = 2,
-    max_colors: int | None = None,
-    pillow_enhance: bool = False,
-    denoise: bool | None = None,
-    flatten_transparency: bool = False,
-) -> SimilarityReport:
-    """Full pipeline + round-trip similarity against the normalized source."""
+    preset: str,
+    detail: str,
+    smooth_level: int,
+    compression_level: int,
+    max_colors: int | None,
+    pillow_enhance: bool,
+    denoise: bool | None,
+    flatten_transparency: bool,
+) -> tuple[SimilarityReport, Image.Image, Image.Image, str]:
+    """Shared vectorize path returning report pieces + source/rendered RGB."""
     normalized = validate_and_normalize(data, filename)
     pre = preprocess.apply_preprocess(
         normalized.png_bytes,
@@ -132,8 +207,6 @@ def vectorize_and_score(
     scour_level = compression_level if compression_level >= 3 else 0
     svg, _ = optimizer.optimize_safe(svg, scour_level)
 
-    # Compare against the preprocessed working buffer (what VTracer actually saw),
-    # composited on white — fairest for alpha / flatten cases.
     source = Image.open(io.BytesIO(pre.png_bytes)).convert("RGBA")
     bg = Image.new("RGBA", source.size, (255, 255, 255, 255))
     bg.alpha_composite(source)
@@ -146,7 +219,7 @@ def vectorize_and_score(
     if preset == "photo":
         notes = "photo is stylized; lower SSIM expected vs logos"
 
-    return SimilarityReport(
+    report = SimilarityReport(
         filename=filename,
         preset=preset,
         detail=detail,
@@ -162,19 +235,108 @@ def vectorize_and_score(
         processing_ok="<svg" in svg.lower() and count_paths(svg) >= 1,
         notes=notes,
     )
+    return report, source_rgb, rendered, svg
+
+
+def vectorize_and_score(
+    data: bytes,
+    filename: str,
+    *,
+    preset: str = "logo",
+    detail: str = "medium",
+    smooth_level: int = 3,
+    compression_level: int = 2,
+    max_colors: int | None = None,
+    pillow_enhance: bool = False,
+    denoise: bool | None = None,
+    flatten_transparency: bool = False,
+) -> SimilarityReport:
+    """Full pipeline + round-trip similarity against the normalized source."""
+    report, _, _, _ = _run_pipeline(
+        data,
+        filename,
+        preset=preset,
+        detail=detail,
+        smooth_level=smooth_level,
+        compression_level=compression_level,
+        max_colors=max_colors,
+        pillow_enhance=pillow_enhance,
+        denoise=denoise,
+        flatten_transparency=flatten_transparency,
+    )
+    return report
+
+
+def vectorize_and_compare(
+    data: bytes,
+    filename: str,
+    *,
+    preset: str = "logo",
+    detail: str = "medium",
+    smooth_level: int = 3,
+    compression_level: int = 2,
+    max_colors: int | None = None,
+    pillow_enhance: bool = False,
+    denoise: bool | None = None,
+    flatten_transparency: bool = False,
+    out_dir: Path | str | None = None,
+) -> ComparisonBundle:
+    """Vectorize, score, and build a labeled source | SVG | diff strip."""
+    report, source, rendered, _svg = _run_pipeline(
+        data,
+        filename,
+        preset=preset,
+        detail=detail,
+        smooth_level=smooth_level,
+        compression_level=compression_level,
+        max_colors=max_colors,
+        pillow_enhance=pillow_enhance,
+        denoise=denoise,
+        flatten_transparency=flatten_transparency,
+    )
+    side, diff = build_side_by_side(
+        source,
+        rendered,
+        ssim_score=report.ssim,
+        mae=report.mae,
+        preset=preset,
+        pillow_enhance=pillow_enhance,
+    )
+
+    comparison_path: str | None = None
+    if out_dir is not None:
+        out = Path(out_dir)
+        out.mkdir(parents=True, exist_ok=True)
+        stem = Path(filename).stem
+        enh = "pillow-on" if pillow_enhance else "pillow-off"
+        path = out / f"{stem}__{preset}__{enh}__ssim-{report.ssim:.3f}.png"
+        side.save(path, format="PNG")
+        comparison_path = str(path)
+        report = SimilarityReport(
+            **{**report.__dict__, "comparison_path": comparison_path}
+        )
+
+    return ComparisonBundle(
+        report=report,
+        source=source,
+        rendered=rendered,
+        diff=diff,
+        side_by_side=side,
+    )
 
 
 def format_report(report: SimilarityReport) -> str:
-    return (
+    base = (
         f"{report.filename:<20} preset={report.preset:<12} "
         f"enh={'on' if report.pillow_enhance else 'off':<3} "
         f"SSIM={report.ssim:.3f} MAE={report.mae:.3f} PSNR={report.psnr:5.1f} "
         f"paths={report.path_count:<4} svg_B={report.svg_bytes}"
     )
+    if report.comparison_path:
+        base += f"  → {report.comparison_path}"
+    return base
 
 
-# Soft floors by content class — not brittle exact matches.
-# Photo is intentionally posterized so the bar is lower.
 SSIM_FLOORS: dict[str, float] = {
     "logo": 0.82,
     "illustration": 0.75,

@@ -1,7 +1,7 @@
-"""CLI: python -m app.similarity path/or/dir --preset logo [--pillow-enhance].
+"""CLI: python -m app.similarity path [--out-dir] [--ab].
 
-Test/eval only: scores round-trip similarity (raster→SVG→raster).
-Does not change the production API and never runs inside the optimizer.
+Eval only: scores round-trip similarity and optionally writes
+source | SVG re-raster | |diff| comparison strips.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from app.core.logging import setup_logging
 from app.eval.similarity import (
     SSIM_FLOORS,
     format_report,
-    vectorize_and_score,
+    vectorize_and_compare,
 )
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
@@ -24,7 +24,10 @@ IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp"}
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="python -m app.similarity",
-        description="Score SVG round-trip similarity (eval only; rasterizes SVG).",
+        description=(
+            "Score SVG round-trip similarity and write side-by-side "
+            "comparison PNGs (eval only; rasterizes SVG)."
+        ),
     )
     p.add_argument("path", type=Path, help="Image file or directory")
     p.add_argument(
@@ -44,6 +47,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--ab",
         action="store_true",
         help="Run both pillow_enhance off and on for each file",
+    )
+    p.add_argument(
+        "--out-dir",
+        type=Path,
+        default=Path("artifacts/similarity"),
+        help="Directory for side-by-side comparison PNGs",
+    )
+    p.add_argument(
+        "--no-images",
+        action="store_true",
+        help="Score only; do not write comparison PNGs",
     )
     return p
 
@@ -78,12 +92,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     enhance_modes = [False, True] if args.ab else [args.pillow_enhance]
+    out_dir = None if args.no_images else args.out_dir
     worst_ok = True
 
     for path in files:
         data = path.read_bytes()
         for enhance in enhance_modes:
-            report = vectorize_and_score(
+            bundle = vectorize_and_compare(
                 data,
                 path.name,
                 preset=args.preset,
@@ -91,12 +106,17 @@ def main(argv: list[str] | None = None) -> int:
                 smooth_level=args.smooth_level,
                 max_colors=args.max_colors,
                 pillow_enhance=enhance,
+                out_dir=out_dir,
             )
+            report = bundle.report
             floor = SSIM_FLOORS.get(args.preset, 0.5)
             flag = "OK" if report.ssim >= floor else "LOW"
             if flag == "LOW":
                 worst_ok = False
             print(f"[{flag}] {format_report(report)}  floor={floor:.2f}")
+
+    if out_dir is not None:
+        print(f"\nSide-by-side images written under {out_dir.resolve()}")
 
     return 0 if worst_ok else 1
 
