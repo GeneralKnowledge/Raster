@@ -151,8 +151,10 @@ async def _run_vectorize_pipeline(
         **vkwargs,
     )
 
-    # Scour only for aggressive level 3; 0–2 use native Config.optimize
-    scour_level = compression_level if compression_level >= 3 else 0
+    # Scour minify tracks compression_level (0=off). Levels 1–2 previously
+    # skipped Scour and only used VTracer native optimize — that left ~50%
+    # size on the table with negligible SSIM impact at level 2.
+    scour_level = compression_level
     optimized_svg, was_optimized = await asyncio.to_thread(
         optimizer.optimize_safe,
         svg,

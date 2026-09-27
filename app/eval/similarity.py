@@ -206,8 +206,7 @@ def _run_pipeline(
         del vkwargs["max_colors"]
 
     svg = vectorizer.vectorize(pre.png_bytes, **vkwargs)
-    scour_level = compression_level if compression_level >= 3 else 0
-    svg, _ = optimizer.optimize_safe(svg, scour_level)
+    svg, _ = optimizer.optimize_safe(svg, compression_level)
 
     source = Image.open(io.BytesIO(pre.png_bytes)).convert("RGBA")
     bg = Image.new("RGBA", source.size, (255, 255, 255, 255))
