@@ -27,3 +27,5 @@ Batch 2 uploads (landscape, IG reel, abstract figure, mushroom cloud, lich) are 
 [`user_samples_batch2/`](./user_samples_batch2/).
 
 Portrait upload results are under [`user_samples_portrait/`](./user_samples_portrait/).
+
+Portrait batch 2 is under [`user_samples_portraits_2/`](./user_samples_portraits_2/).
