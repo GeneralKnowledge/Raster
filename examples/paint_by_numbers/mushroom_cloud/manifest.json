@@ -1,0 +1,204 @@
+{
+  "width": 1000,
+  "height": 462,
+  "max_colors_requested": 10,
+  "colors": 6,
+  "regions": 35,
+  "min_region_area": 120,
+  "palette": [
+    {
+      "id": 1,
+      "rgb": [
+        79,
+        20,
+        13
+      ],
+      "hex": "#4f140d",
+      "pixel_count": 258600,
+      "region_count": 2
+    },
+    {
+      "id": 2,
+      "rgb": [
+        33,
+        14,
+        12
+      ],
+      "hex": "#210e0c",
+      "pixel_count": 60363,
+      "region_count": 5
+    },
+    {
+      "id": 3,
+      "rgb": [
+        164,
+        59,
+        33
+      ],
+      "hex": "#a43b21",
+      "pixel_count": 39837,
+      "region_count": 8
+    },
+    {
+      "id": 4,
+      "rgb": [
+        113,
+        34,
+        21
+      ],
+      "hex": "#712215",
+      "pixel_count": 39153,
+      "region_count": 8
+    },
+    {
+      "id": 5,
+      "rgb": [
+        221,
+        104,
+        54
+      ],
+      "hex": "#dd6836",
+      "pixel_count": 37643,
+      "region_count": 7
+    },
+    {
+      "id": 6,
+      "rgb": [
+        245,
+        203,
+        118
+      ],
+      "hex": "#f5cb76",
+      "pixel_count": 26404,
+      "region_count": 5
+    }
+  ],
+  "steps": [
+    {
+      "step": 1,
+      "color_id": 1,
+      "hex": "#4f140d",
+      "rgb": [
+        79,
+        20,
+        13
+      ],
+      "region_ids": [
+        0,
+        1
+      ],
+      "area": 258600,
+      "fill_svg": "steps/step_01_color_1.svg"
+    },
+    {
+      "step": 2,
+      "color_id": 2,
+      "hex": "#210e0c",
+      "rgb": [
+        33,
+        14,
+        12
+      ],
+      "region_ids": [
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "area": 60363,
+      "fill_svg": "steps/step_02_color_2.svg"
+    },
+    {
+      "step": 3,
+      "color_id": 3,
+      "hex": "#a43b21",
+      "rgb": [
+        164,
+        59,
+        33
+      ],
+      "region_ids": [
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22
+      ],
+      "area": 39837,
+      "fill_svg": "steps/step_03_color_3.svg"
+    },
+    {
+      "step": 4,
+      "color_id": 4,
+      "hex": "#712215",
+      "rgb": [
+        113,
+        34,
+        21
+      ],
+      "region_ids": [
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "area": 39153,
+      "fill_svg": "steps/step_04_color_4.svg"
+    },
+    {
+      "step": 5,
+      "color_id": 5,
+      "hex": "#dd6836",
+      "rgb": [
+        221,
+        104,
+        54
+      ],
+      "region_ids": [
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29
+      ],
+      "area": 37643,
+      "fill_svg": "steps/step_05_color_5.svg"
+    },
+    {
+      "step": 6,
+      "color_id": 6,
+      "hex": "#f5cb76",
+      "rgb": [
+        245,
+        203,
+        118
+      ],
+      "region_ids": [
+        30,
+        31,
+        32,
+        33,
+        34
+      ],
+      "area": 26404,
+      "fill_svg": "steps/step_06_color_6.svg"
+    }
+  ],
+  "files": {
+    "outline_svg": "outline.svg",
+    "numbered_svg": "numbered.svg",
+    "quantized_png": "quantized.png",
+    "manifest": "manifest.json"
+  },
+  "projector_hint": "Project outline.svg (or numbered.svg) as the base. Advance through steps/*.svg \u2014 each shows one color to paint."
+}

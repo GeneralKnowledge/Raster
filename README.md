@@ -20,6 +20,18 @@ uvicorn app.main:app --reload
 
 Open docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
+## Paint-by-numbers (spike)
+
+Sibling feature for **projector step-by-step** painting — shared quantize/VTracer
+engine, separate output kit (not bolted onto `/v1/vectorize`):
+
+```bash
+python -m app.paint_by_numbers examples/shape.jpg /tmp/pbn --max-colors 12
+# open /tmp/pbn/projector.html  →  Outline → Numbered → per-color steps
+```
+
+See [`examples/paint_by_numbers/`](examples/paint_by_numbers/).
+
 ## What it does
 
 1. Validates & normalizes the upload with Pillow (RGBA PNG working buffer)

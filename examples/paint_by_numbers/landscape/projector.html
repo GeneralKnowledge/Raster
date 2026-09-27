@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Paint by numbers — projector</title>
+<style>
+  html, body { margin:0; height:100%; background:#111; color:#eee;
+    font-family: system-ui, sans-serif; }
+  #stage { position:fixed; inset:0; display:flex; align-items:center;
+    justify-content:center; }
+  #stage object, #stage img { max-width:96vw; max-height:85vh;
+    background:#fff; }
+  #hud { position:fixed; left:0; right:0; bottom:0; padding:12px 16px;
+    background:rgba(0,0,0,.75); display:flex; gap:16px; align-items:center;
+    flex-wrap:wrap; }
+  button { font-size:1rem; padding:.4rem .9rem; cursor:pointer; }
+  .swatch { display:flex; align-items:center; gap:6px; margin:2px 8px 2px 0; }
+  .swatch span { width:18px; height:18px; border:1px solid #666; display:inline-block; }
+  #legend { display:flex; flex-wrap:wrap; max-width:50vw; }
+</style>
+</head>
+<body>
+  <div id="stage"><object id="frame" type="image/svg+xml" data="outline.svg"></object></div>
+  <div id="hud">
+    <button id="prev" type="button">Prev</button>
+    <button id="next" type="button">Next</button>
+    <strong id="label">Outline</strong>
+    <div id="legend"><div class="swatch"><span style="background:#536d3d"></span>1 #536d3d</div><div class="swatch"><span style="background:#e9dca1"></span>2 #e9dca1</div><div class="swatch"><span style="background:#323023"></span>3 #323023</div><div class="swatch"><span style="background:#da8633"></span>4 #da8633</div><div class="swatch"><span style="background:#f9efc8"></span>5 #f9efc8</div><div class="swatch"><span style="background:#4e4e2e"></span>6 #4e4e2e</div><div class="swatch"><span style="background:#c4e3ea"></span>7 #c4e3ea</div><div class="swatch"><span style="background:#a7b78b"></span>8 #a7b78b</div><div class="swatch"><span style="background:#e9be61"></span>9 #e9be61</div><div class="swatch"><span style="background:#8c8442"></span>10 #8c8442</div><div class="swatch"><span style="background:#cfdad0"></span>11 #cfdad0</div></div>
+  </div>
+  <script>
+    const slides = ["outline.svg", "numbered.svg", "steps/step_01_color_1.svg", "steps/step_02_color_2.svg", "steps/step_03_color_3.svg", "steps/step_04_color_4.svg", "steps/step_05_color_5.svg", "steps/step_06_color_6.svg", "steps/step_07_color_7.svg", "steps/step_08_color_8.svg", "steps/step_09_color_9.svg", "steps/step_10_color_10.svg", "steps/step_11_color_11.svg"];
+    const names = ["Outline", "Numbered",
+      "Step 1: color 1 (#536d3d)", "Step 2: color 2 (#e9dca1)", "Step 3: color 3 (#323023)", "Step 4: color 4 (#da8633)", "Step 5: color 5 (#f9efc8)", "Step 6: color 6 (#4e4e2e)", "Step 7: color 7 (#c4e3ea)", "Step 8: color 8 (#a7b78b)", "Step 9: color 9 (#e9be61)", "Step 10: color 10 (#8c8442)", "Step 11: color 11 (#cfdad0)"];
+    let i = 0;
+    const frame = document.getElementById("frame");
+    const label = document.getElementById("label");
+    function show(n) {
+      i = (n + slides.length) % slides.length;
+      frame.data = slides[i];
+      label.textContent = names[i];
+    }
+    document.getElementById("prev").onclick = () => show(i - 1);
+    document.getElementById("next").onclick = () => show(i + 1);
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight" || e.key === " ") show(i + 1);
+      if (e.key === "ArrowLeft") show(i - 1);
+    });
+  </script>
+</body>
+</html>
