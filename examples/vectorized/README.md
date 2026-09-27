@@ -25,3 +25,5 @@ are under [`user_samples/`](./user_samples/) with comparison strips + SVGs.
 
 Batch 2 uploads (landscape, IG reel, abstract figure, mushroom cloud, lich) are under
 [`user_samples_batch2/`](./user_samples_batch2/).
+
+Portrait upload results are under [`user_samples_portrait/`](./user_samples_portrait/).
