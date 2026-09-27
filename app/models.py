@@ -82,8 +82,8 @@ SMOOTH_LEVEL_DESC = (
     "higher values produce smoother splines."
 )
 COMPRESSION_LEVEL_DESC = (
-    "Compression: 0=off, 1–2=VTracer native optimize, "
-    "3=native optimize + aggressive Scour minify."
+    "Compression 0–3: VTracer native optimize (capped at 2) plus matching "
+    "Scour minify (0=off, 2=default ~25–55% smaller, 3=most aggressive)."
 )
 DETAIL_DESC = "Detail overlay: low (fewer shapes), medium, high (more detail)."
 PRESET_DESC = (

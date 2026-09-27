@@ -1,4 +1,8 @@
-"""Scour-based SVG optimizer — vector-only, fail-soft."""
+"""Scour-based SVG optimizer — vector-only, fail-soft.
+
+Used for ``compression_level`` 1–3 (API default is 2). Level 0 skips Scour.
+Never rasterizes.
+"""
 
 from __future__ import annotations
 

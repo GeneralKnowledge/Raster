@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
         if pre.quantized and "max_colors" in vkwargs:
             del vkwargs["max_colors"]
         svg = vectorizer.vectorize(pre.png_bytes, **vkwargs)
-        scour_level = args.compression_level if args.compression_level >= 3 else 0
+        scour_level = args.compression_level
         svg, _ = optimizer.optimize_safe(svg, scour_level)
     except AppError as exc:
         print(f"Error ({exc.code}): {exc.message}", file=sys.stderr)
