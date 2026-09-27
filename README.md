@@ -32,6 +32,20 @@ python -m app.paint_by_numbers examples/shape.jpg /tmp/pbn --max-colors 12
 
 See [`examples/paint_by_numbers/`](examples/paint_by_numbers/).
 
+## Background remove / blur (experiment)
+
+Optional rembg preprocess for photos — cut out or blur the background before
+vectorizing. **Not wired into the API**; A/B CLI only:
+
+```bash
+pip install 'rembg[cpu]'   # or: pip install '.[bg]'
+python -m app.bg_experiment path/to/portrait.jpg \
+  --out-dir artifacts/bg_experiment --preset photo --also-illustration-high
+```
+
+Modes: `none` (baseline) · `remove` (subject on white) · `blur` (soft bg).
+See [`examples/vectorized/bg_experiment/`](examples/vectorized/bg_experiment/).
+
 ## What it does
 
 1. Validates & normalizes the upload with Pillow (RGBA PNG working buffer)

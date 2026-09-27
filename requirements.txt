@@ -13,3 +13,5 @@ httpx>=0.27.0
 cairosvg>=2.7.0
 scikit-image>=0.24.0
 numpy>=1.26.0
+# Optional: photo background remove/blur experiment (python -m app.bg_experiment)
+# rembg[cpu]>=2.0.50
