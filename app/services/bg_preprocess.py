@@ -105,8 +105,13 @@ def remove_background(
     *,
     session: Any | None = None,
     fill_rgba: tuple[int, int, int, int] = DEFAULT_FILL_RGBA,
-) -> tuple[Image.Image, float]:
-    """Cut out the subject and composite onto ``fill_rgba`` (opaque)."""
+) -> tuple[Image.Image, float, Image.Image]:
+    """Cut out the subject and composite onto ``fill_rgba`` (opaque).
+
+    Returns ``(composited_rgba, mask_coverage, subject_mask_L)``.
+    The mask is the pre-composite cutout alpha — do not use the opaque
+    canvas alpha after fill (that is always 255).
+    """
     try:
         from rembg import remove
     except ImportError as exc:  # pragma: no cover
@@ -121,11 +126,12 @@ def remove_background(
     if not isinstance(cutout, Image.Image):
         cutout = Image.open(io.BytesIO(cutout))
     cutout = cutout.convert("RGBA")
+    subject = cutout.getchannel("A").convert("L")
 
     canvas = Image.new("RGBA", cutout.size, fill_rgba)
     canvas.alpha_composite(cutout)
-    coverage = _mask_coverage(cutout.getchannel("A"))
-    return canvas, coverage
+    coverage = _mask_coverage(subject)
+    return canvas, coverage, subject
 
 
 def blur_background(
@@ -173,7 +179,7 @@ def apply_bg_preprocess(
             )
 
     if mode == "remove":
-        out, coverage = remove_background(
+        out, coverage, _subject = remove_background(
             png_bytes, session=session, fill_rgba=fill_rgba
         )
         return BgPreprocessResult(

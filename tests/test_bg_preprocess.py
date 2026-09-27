@@ -85,9 +85,17 @@ def test_blur_keeps_subject_softens_bg(_mock_remove) -> None:
 @patch("rembg.remove", side_effect=_fake_mask)
 def test_remove_and_blur_helpers(_mock_remove) -> None:
     img = _scene()
-    cutout, cov = remove_background(img, session=object())
+    cutout, cov, mask = remove_background(img, session=object())
     assert cutout.mode == "RGBA"
     assert cov > 0
-    blurred, cov2 = blur_background(img, session=object(), blur_radius=4.0)
+    assert mask.mode == "L"
+    # Subject alpha must not be the opaque post-composite canvas
+    assert mask.getpixel((2, 2)) < 128
+    assert mask.getpixel((40, 40)) > 200
+    blurred, cov2 = blur_background(img, session=object(), blur_radius=4.0, mask=mask)
     assert blurred.mode == "RGBA"
     assert cov2 > 0
+    # Blurred bg corner should differ from sharp original stripes
+    orig = img.convert("RGB").getpixel((2, 2))
+    soft = blurred.convert("RGB").getpixel((2, 2))
+    assert soft != orig or cov2 < 1.0

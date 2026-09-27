@@ -161,10 +161,9 @@ def _bg_stage(
 
     mask = cached_mask
     if mode == "remove":
-        # Full rembg cutout once; reuse alpha as mask for blur.
+        # Full rembg cutout once; reuse true subject alpha as mask for blur.
         if cached_mask is None and session is not None:
-            out, coverage = remove_background(image_png, session=session)
-            mask = out.getchannel("A")
+            out, coverage, mask = remove_background(image_png, session=session)
         else:
             assert mask is not None
             rgba = Image.open(io.BytesIO(image_png)).convert("RGBA")
