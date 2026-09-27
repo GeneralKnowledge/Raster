@@ -51,7 +51,7 @@ CPU work runs in `asyncio.to_thread`. Concurrency capped by `MAX_CONCURRENT_JOBS
 | Cutout | hierarchical re-trace | true mosaic `cutout` |
 | Color budget | DIY Pillow quantize | native **`max_colors`** / palette |
 | Curve cleanup | spline knobs only | native **`simplify`** (Schneider re-fit) |
-| SVG minify | Scour only | native **`optimize`** 0–2 (+ optional Scour) |
+| SVG minify | Scour only | native **`optimize`** 0–2 + Scour at matching `compression_level` |
 | Built-in presets | — | `Config.photo()`, `poster()`, `bw()` |
 
 ## Endpoints
