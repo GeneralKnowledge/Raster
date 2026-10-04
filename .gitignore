@@ -21,3 +21,9 @@ htmlcov/
 !examples/**
 !examples/**/*.svg
 artifacts/
+
+user_tests/
+user_tests2/
+user_tests3/
+user_tests4/
+artifacts/

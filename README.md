@@ -20,11 +20,37 @@ uvicorn app.main:app --reload
 
 Open docs: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-## Experiments
+## Paint-by-numbers (spike)
 
-**Double-vectorize** (pass1 → re-raster + reinject original detail → pass2): helps
-*photos* when pass1 is coarser (`--pass1-detail low`), but hurts illustrations.
-See [`examples/double_pass/`](examples/double_pass/) — not enabled on the API by default.
+Sibling feature for **projector step-by-step** painting — shared quantize/VTracer
+engine, separate output kit (not bolted onto `/v1/vectorize`):
+
+```bash
+python -m app.paint_by_numbers examples/shape.jpg /tmp/pbn --max-colors 12
+# open /tmp/pbn/projector.html  →  Outline → Numbered → per-color steps
+```
+
+See [`examples/paint_by_numbers/`](examples/paint_by_numbers/).
+
+## Background remove / blur (experiment)
+
+Optional rembg preprocess for photos — cut out or blur the background before
+vectorizing. **Not wired into the API**; A/B CLI only:
+
+```bash
+pip install 'rembg[cpu]'   # or: pip install '.[bg]'
+python -m app.bg_experiment path/to/portrait.jpg \
+  --out-dir artifacts/bg_experiment --preset photo --also-illustration-high
+```
+
+Modes: `none` (baseline) · `remove` (subject on white) · `blur` (soft bg).
+See [`examples/vectorized/bg_experiment/`](examples/vectorized/bg_experiment/).
+
+## Double-vectorize (experiment)
+
+Pass1 → re-raster + reinject original detail → pass2. Helps *photos* when pass1
+is coarser (`--pass1-detail low`), but hurts illustrations. See
+[`examples/double_pass/`](examples/double_pass/) — not enabled on the API by default.
 
 ```bash
 python -m app.double_pass photo.jpg --preset photo --pass1-detail low --strength 0.5
@@ -36,7 +62,7 @@ python -m app.double_pass photo.jpg --preset photo --pass1-detail low --strength
 2. Light preprocess only: optional flatten alpha, photo upscale, median denoise
 3. Resolves preset + smooth/detail/compression into a VTracer **`Config`**
 4. Calls `Config.convert_bytes(png_bytes, format="png")`
-5. Optional Scour pass only at `compression_level=3` (levels 0–2 use native `optimize`)
+5. SVG minify: VTracer native ``optimize`` (0–2) + matching Scour pass (fail-soft)
 
 CPU work runs in `asyncio.to_thread`. Concurrency capped by `MAX_CONCURRENT_JOBS` (default 2); overflow → `503 busy`.
 
@@ -49,7 +75,7 @@ CPU work runs in `asyncio.to_thread`. Concurrency capped by `MAX_CONCURRENT_JOBS
 | Cutout | hierarchical re-trace | true mosaic `cutout` |
 | Color budget | DIY Pillow quantize | native **`max_colors`** / palette |
 | Curve cleanup | spline knobs only | native **`simplify`** (Schneider re-fit) |
-| SVG minify | Scour only | native **`optimize`** 0–2 (+ optional Scour) |
+| SVG minify | Scour only | native **`optimize`** 0–2 + Scour at matching `compression_level` |
 | Built-in presets | — | `Config.photo()`, `poster()`, `bw()` |
 
 ## Endpoints
@@ -70,7 +96,7 @@ Also: `/docs`, `/redoc`, `/openapi.json`.
 | `file` | required | PNG, JPEG, WebP, BMP |
 | `preset` | `logo` | `logo` \| `illustration` \| `photo` \| `lineart` \| `pixelart` |
 | `smooth_level` | `3` | `0`–`5` → mode + **`simplify`** tolerance |
-| `compression_level` | `2` | `0`–`2` = native optimize; `3` = optimize + Scour |
+| `compression_level` | `2` | native optimize + Scour minify (0=off … 3=max) |
 | `detail` | `medium` | affects speckles / watershed_detail / photo colors |
 | `max_colors` | auto | passed to Config; photo defaults **16/36/48** by detail |
 | `denoise` | auto | light median; default on for photo |
@@ -114,9 +140,9 @@ curl -sS -X POST "http://localhost:8000/v1/vectorize" \
 | Level | Behavior |
 |-------|----------|
 | 0 | `optimize=0`, no Scour |
-| 1 | `optimize=1` |
-| 2 | `optimize=2` (default) |
-| 3 | `optimize=2` + aggressive Scour (fail-soft) |
+| 1 | `optimize=1` + light Scour (strip metadata/whitespace) |
+| 2 | `optimize=2` + Scour precision/group minify (**default**, ~25–55% smaller) |
+| 3 | `optimize=2` + aggressive Scour (shortest ids / tighter digits) |
 
 ## Pillow enhance (photo-default)
 
