@@ -46,6 +46,16 @@ python -m app.bg_experiment path/to/portrait.jpg \
 Modes: `none` (baseline) · `remove` (subject on white) · `blur` (soft bg).
 See [`examples/vectorized/bg_experiment/`](examples/vectorized/bg_experiment/).
 
+## Double-vectorize (experiment)
+
+Pass1 → re-raster + reinject original detail → pass2. Helps *photos* when pass1
+is coarser (`--pass1-detail low`), but hurts illustrations. See
+[`examples/double_pass/`](examples/double_pass/) — not enabled on the API by default.
+
+```bash
+python -m app.double_pass photo.jpg --preset photo --pass1-detail low --strength 0.5
+```
+
 ## What it does
 
 1. Validates & normalizes the upload with Pillow (RGBA PNG working buffer)
